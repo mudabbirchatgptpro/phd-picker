@@ -349,7 +349,16 @@ function viewRank() {
     <div class="row"><button class="btn primary" id="lock">Lock my list</button><span class="help">Makes a code to paste to Claude. You can lock again after another round.</span></div>
     <div id="lockbox" hidden></div>`;
 }
+let seeded = false;
 function show() {
+  // A browser with no saved marks starts from his round 1 result, at round 2.
+  if (!seeded && P.length) {
+    seeded = true;
+    if (!Object.keys(S.d).length && S.round === 1) {
+      for (const r of P) if (r.r1 === 'd') { S.d[r.key] = 'drop'; S.dr[r.key] = 1; }
+      S.round = 2; sortBy = 'weak'; view = 'go'; save();
+    }
+  }
   compute();
   const y = window.scrollY;
   const banner = S.round === 1 && C.kept.length ? `<div class="panel" style="border:2px solid var(--go)"><h2>Round 2 is ready</h2>
