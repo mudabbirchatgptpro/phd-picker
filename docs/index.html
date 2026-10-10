@@ -90,6 +90,7 @@ details dt{color:var(--mute)}details dd{margin:0;overflow-wrap:anywhere}
 .cutline{border-top:3px dashed var(--ink);padding-top:6px;font-weight:600}
 #n{width:70px;padding:8px;border:1px solid var(--line);border-radius:8px}
 @media(max-width:600px){.rk{flex-wrap:wrap}.rk-btn{width:100%;justify-content:flex-start}}
+.subs{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13.5px}.free{background:var(--go);color:#fff;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:6px}
 .r2{border:2px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:14.5px}
 .r2.DROP{border-color:var(--no);background:var(--nobg)}.r2.LEAN_DROP{border-color:var(--may);background:var(--maybg)}.r2.KEEP,.r2.STRONG{border-color:var(--go);background:var(--gobg)}
 </style>
@@ -147,12 +148,12 @@ try { const l = JSON.parse(localStorage.getItem('phd-picker-login')); if (l) ope
 const BO = { pass: 0, check: 1, weak: 2, cut: 3 };
 const STATUS = { pass: 'Clears every gate', check: 'Something not confirmed', weak: 'Funding not guaranteed', cut: 'Fails a gate' };
 const phd = (r) => r.degree === 'PhD' || r.degree === 'PhD?';
-const base = (r) => r.bucket !== 'cut' && (r.short || r.locked || r.late || (r.bucket === 'pass' && phd(r)));
+const base = (r) => r.bucket !== 'cut' && !r.dup && (r.short || r.locked || r.late || (r.bucket === 'pass' && phd(r)));
 const best = (a, b) => BO[a.bucket] - BO[b.bucket] || (b.locked ? 1 : 0) - (a.locked ? 1 : 0) || (a.short || 9) - (b.short || 9) || a.inst.localeCompare(b.inst);
 const weak = (a, b) => ((b.r2 || {}).rank || 0) - ((a.r2 || {}).rank || 0) || best(b, a);
 const SORTS = { best, weak, r2: (a, b) => weak(b, a), deadline: (a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || best(a, b),
   inst: (a, b) => a.inst.localeCompare(b.inst) || best(a, b), fee: (a, b) => (a.fee ?? 9999) - (b.fee ?? 9999) || best(a, b) };
-const SORT_OPTS = '<option value="weak">Weakest first (round 2 research)</option><option value="best">Strongest first</option><option value="deadline">Earliest deadline</option><option value="inst">University A to Z</option><option value="fee">Lowest fee</option>';
+const SORT_OPTS = '<option value="weak">Lowest score first</option><option value="best">Strongest first</option><option value="deadline">Earliest deadline</option><option value="inst">University A to Z</option><option value="fee">Lowest fee</option>';
 
 // S.d: key -> 'keep' | 'drop'. S.dr: round a program was dropped in. S.extra: programs he added from outside the best picks.
 let S = { round: 1, rules: { fee: 'any', fam: [] }, d: {}, dr: {}, extra: [], rank: [], n: 12 };
@@ -199,7 +200,7 @@ function compute() {
   }
   const pool = cand.filter((r) => !why.has(r.key));
   C = { cand, why, pool, removed: cand.filter((r) => why.has(r.key)), kept: pool.filter((r) => S.d[r.key] === 'keep'), todo: pool.filter((r) => !S.d[r.key]),
-    dropped: P.filter((r) => S.d[r.key] === 'drop') };
+    dropped: P.filter((r) => S.d[r.key] === 'drop' && !r.dup) };
   $('#n-round').textContent = S.round; $('#n-todo').textContent = C.todo.length; $('#n-keep').textContent = C.kept.length; $('#n-drop').textContent = C.dropped.length;
   const sm = { narrow: C.pool.length + ' programs in play', go: C.todo.length + ' left to decide', rank: C.kept.length + ' kept', out: (C.dropped.length + C.removed.length) + ' set aside' };
   $('#steps').innerHTML = [['narrow', '1. Set rules'], ['go', '2. Keep or drop'], ['rank', '3. Rank and lock'], ['out', 'Left out']]
@@ -216,6 +217,7 @@ function decide(k, v) {
   save(); show();
 }
 
+const SUBS = [['fit', 'Faculty fit', 25], ['funding', 'Funding', 20], ['eligibility', 'Eligibility and visa', 15], ['odds', 'Your odds', 15], ['standing', 'Standing', 10], ['certainty', 'Certainty', 7], ['cost', 'Cost to apply', 5], ['gre', 'GRE', 3]];
 const V2 = { STRONG: 'Strong keep', KEEP: 'Keep', LEAN_DROP: 'Leaning drop', DROP: 'Drop' };
 const GRE = { required: ['Required', 'bad'], optional: ['Optional', 'good'], not_required: ['Not required', 'good'], not_accepted: ['Not accepted', 'good'], unknown: ['Not confirmed', 'unk'] };
 const FUND = { guaranteed: ['Guaranteed', 'good'], most: ['Most students', 'good'], competitive: ['Competitive', 'unk'], none: ['None', 'bad'], unknown: ['Not confirmed', 'unk'] };
@@ -229,7 +231,7 @@ function card(r, foot) {
   const dl = r.deadline ? [fmtDate(r.deadline), ''] : r.deadline_text ? ['Last cycle, see details', 'unk'] : ['Not confirmed', 'unk'];
   const visa = r.online ? ['Online, no F-1', 'bad'] : null;
   const x = r.r2 || {};
-  const d = [['Faculty fit', x.fit_why], ['Standing', x.rep], ['How selective', x.sel], ['What they expect', x.bar], ['Eligibility and visa', x.elig], ['Money', x.money], ['Outcomes', x.out], ['Red flags', x.red], ['Why this status', (r.why || []).join('; ')], ['GRE, in their words', r.gre_quote], ['English test, in their words', r.eng_quote], ['English minimum', r.eng_min],
+  const d = [...(r.sc ? SUBS.filter(([k]) => r.sc.why[k]).map(([k, t, m]) => [`${t}: ${r.sc.sub[k]} of ${m}`, r.sc.why[k]]) : []), ['Faculty fit', x.fit_why], ['Standing', x.rep], ['How selective', x.sel], ['What they expect', x.bar], ['Eligibility and visa', x.elig], ['Money', x.money], ['Outcomes', x.out], ['Red flags', x.red], ['Why this status', (r.why || []).join('; ')], ['GRE, in their words', r.gre_quote], ['English test, in their words', r.eng_quote], ['English minimum', r.eng_min],
     ['Funding, in their words', r.fund_quote], ['Stipend', r.stipend], ['Years funded', r.fund_years], ['Deadline note', r.deadline_text],
     ['Fee waiver, how', r.fee_waiver_how], ['Fee note', r.fee_note], ['Taking students for fall 2027', { yes: 'Yes', no: 'No', unknown: 'Not confirmed' }[r.admit]],
     ['STEM field (for OPT)', r.stem === true ? 'Yes' : r.stem === false ? 'No' : ''], ['What to submit', r.materials], ['Faculty', r.faculty],
@@ -238,13 +240,14 @@ function card(r, foot) {
     .filter((x) => x[1]).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
   const link = r.url_adm || r.url;
   return `<div class="card ${mine}" data-k="${r.key}">
-    <div class="head"><div><div class="uni">${esc(r.inst)}${r.state ? ', ' + esc(r.state) : ''}</div>
+    <div class="head"><div><div class="uni">${esc(r.inst)}${r.state ? ', ' + esc(r.state) : ''}${r.fee === 0 ? '<span class="free">FREE TO APPLY</span>' : ''}</div>
       <div class="prog">${esc(r.program)}${r.locked ? ' · <b>in your earlier locked 14</b>' : ''}</div></div>
       <span class="pill ${r.bucket}">${STATUS[r.bucket]}</span></div>
     <div class="facts">${fact('Application fee', fee)}${fact('Fee waiver', WAIVE[r.fee_waiver] || ['Not confirmed', 'unk'])}${fact('GRE', GRE[r.gre] || GRE.unknown)}
       ${fact('English test', ENG[r.eng] || ['Not confirmed', 'unk'], r.eng ? '' : '')}${fact('Funding', visa && r.fund === 'unknown' ? visa : FUND[r.fund] || FUND.unknown, r.stipend ? String(r.stipend).slice(0, 40) : '')}${fact('Deadline', dl)}</div>
     ${r.online ? '<div class="flag">Online program: it cannot sponsor an F-1 visa.</div>' : ''}
-    ${r.r2 ? `<div class="r2 ${r.r2.v}"><b>Round 2 research: ranked ${r.r2.rank} of 230 · ${V2[r.r2.v] || ''} · fit ${r.r2.fit} of 5 · confidence ${esc(r.r2.conf || 'not stated')}</b>
+    ${r.r2 ? `<div class="r2 ${r.r2.v}"><b>${r.sc ? `Score ${r.sc.score} of 100 · ranked ${r.r2.rank} of 227 · ` : ''}${V2[r.r2.v] || ''} · confidence ${esc(r.r2.conf || 'not stated')}</b>
+      ${r.sc ? `<div class="subs">${SUBS.map(([k, t, m]) => `<span title="${esc(r.sc.why[k] || '')}">${t} <b>${r.sc.sub[k]}</b>/${m}</span>`).join('')}</div>` : ''}
       <div><b>Why drop:</b> ${esc(r.r2.drop)}</div><div><b>Why keep:</b> ${esc(r.r2.keep)}</div></div>` : ''}
     ${r.late ? '<div class="flag"><b>Added 10 Oct.</b> A live PhD that was not among the first 350. Its facts have had a lighter read.</div>' : ''}
     ${r.dup ? `<div class="flag">Looks like the same program as one already in play: ${esc(r.dup)}</div>` : ''}
@@ -310,7 +313,7 @@ function viewGo() {
 function fillList() {
   const el = $('#list'); if (!el || view === 'rank') return;
   const src = view === 'go' ? (showIn === 'todo' ? C.todo : showIn === 'keep' ? C.kept : C.pool)
-    : { dropped: C.dropped, rules: C.removed, alive: P.filter((r) => r.bucket !== 'cut' && !base(r) && !S.extra.includes(r.key) && !S.d[r.key]), cut: P.filter((r) => r.bucket === 'cut' && !S.extra.includes(r.key) && !S.d[r.key]) }[sub];
+    : { dropped: C.dropped, rules: C.removed, dup: P.filter((r) => r.dup), alive: P.filter((r) => r.bucket !== 'cut' && !r.dup && !base(r) && !S.extra.includes(r.key) && !S.d[r.key]), cut: P.filter((r) => r.bucket === 'cut' && !S.extra.includes(r.key) && !S.d[r.key]) }[sub];
   const rows = src.filter((r) => !q || (r.inst + ' ' + r.program + ' ' + (r.state || '')).toLowerCase().includes(q)).sort(SORTS[sortBy]);
   const foot = (r) => view === 'go' ? pickBtns(r)
     : sub === 'dropped' ? `<div class="flag">You dropped this in round ${S.dr[r.key] || 1}.</div><div class="pick"><button data-p="">Bring back</button></div>`
@@ -321,8 +324,8 @@ function fillList() {
   $('#more').hidden = rows.length <= limit;
 }
 function viewOut() {
-  const n = { dropped: C.dropped.length, rules: C.removed.length, alive: P.filter((r) => r.bucket !== 'cut' && !base(r) && !S.extra.includes(r.key) && !S.d[r.key]).length, cut: P.filter((r) => r.bucket === 'cut' && !S.extra.includes(r.key) && !S.d[r.key]).length };
-  const t = { dropped: 'Dropped by me', rules: 'Removed by my rules', alive: 'Other programs still alive', cut: 'Failed a gate' };
+  const n = { dropped: C.dropped.length, rules: C.removed.length, dup: P.filter((r) => r.dup).length, alive: P.filter((r) => r.bucket !== 'cut' && !r.dup && !base(r) && !S.extra.includes(r.key) && !S.d[r.key]).length, cut: P.filter((r) => r.bucket === 'cut' && !S.extra.includes(r.key) && !S.d[r.key]).length };
+  const t = { dropped: 'Dropped by me', rules: 'Removed by my rules', dup: 'Repeats of a program in play', alive: 'Other programs still alive', cut: 'Failed a gate' };
   return `<h1>Left out</h1><p class="help">Everything that is not in play. Any of it can come back.</p>
     <div class="tabs">${Object.keys(t).map((k) => `<button class="tab" data-sub="${k}" aria-pressed="${k === sub}">${t[k]}<span>${n[k]}</span></button>`).join('')}</div>
     <div class="filters"><input type="search" id="q" placeholder="Search university or program"><select id="sort">${SORT_OPTS}</select></div>
@@ -335,11 +338,11 @@ function viewRank() {
   return `<h1>Rank and lock</h1>
     <p class="help">Best first. Drag a row, or use the arrows. Press a name to see its details. Programs above the line are the ones you apply to. The rest are your reserve.</p>
     <div class="filters"><label>I will apply to <input type="number" id="n" min="1" value="${n}"> programs</label>
-      <span>Order them for me:</span><button class="btn" data-ord="r2">Round 2 research</button><button class="btn" data-ord="best">First strength</button><button class="btn" data-ord="deadline">Deadline</button><button class="btn" data-ord="fee">Fee</button></div>
+      <span>Order them for me:</span><button class="btn" data-ord="r2">Score out of 100</button><button class="btn" data-ord="best">First strength</button><button class="btn" data-ord="deadline">Deadline</button><button class="btn" data-ord="fee">Fee</button></div>
     ${C.todo.length ? `<div class="flag">${C.todo.length} programs are still undecided in step 2. They are not in this ranking.</div>` : ''}
     <div id="rank" style="display:flex;flex-direction:column;gap:8px">${R.map((r, i) => `${i === n ? `<div class="cutline">Above: ${top.length} to apply, fees $${top.reduce((s, x) => s + (x.fee || 0), 0).toLocaleString()}${unk ? ' + ' + unk + ' not confirmed' : ''}. Below: ${R.length - n} in reserve.</div>` : ''}
       <div class="rk ${i >= n ? 'res' : ''}" draggable="true" data-k="${r.key}"><span class="num">${i + 1}</span>
-        <div class="rk-main"><b>${esc(r.inst)}</b><div class="prog">${esc(r.program)}</div><div class="mini">${mini(r)}</div></div>
+        <div class="rk-main"><b>${r.sc ? r.sc.score + ' · ' : ''}${esc(r.inst)}</b>${r.fee === 0 ? '<span class="free">FREE</span>' : ''}<div class="prog">${esc(r.program)}</div><div class="mini">${mini(r)}</div></div>
         <div class="rk-btn"><button data-mv="top">Top</button><button data-mv="-1" aria-label="Up">&#9650;</button><button data-mv="1" aria-label="Down">&#9660;</button><button data-mv="drop">Drop</button></div></div>
       ${openK === r.key ? card(r, '') : ''}`).join('')}</div>
     <div class="row"><button class="btn primary" id="lock">Lock my list</button><span class="help">Makes a code to paste to Claude. You can lock again after another round.</span></div>
