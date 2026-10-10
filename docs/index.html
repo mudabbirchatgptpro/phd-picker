@@ -407,6 +407,14 @@ function show() {
       for (const r of P) if (r.ap2 && !S.d[r.key]) S.d[r.key] = 'keep';
       S.m6 = 1; save();
     }
+    if (!S.m7 && P.some((r) => r.s3)) {
+      // Research of 10 Oct on the additions: a "free" entry that did not hold up leaves the kept list, a confirmed one joins it.
+      for (const r of P) {
+        if (r.unap && S.d[r.key] === 'keep') delete S.d[r.key];
+        if (r.ap2 && !S.d[r.key]) S.d[r.key] = 'keep';
+      }
+      S.rules.late = false; S.m7 = 1; save();
+    }
   }
   compute();
   const y = window.scrollY;
