@@ -145,7 +145,7 @@ try { const l = JSON.parse(localStorage.getItem('phd-picker-login')); if (l) ope
 const BO = { pass: 0, check: 1, weak: 2, cut: 3 };
 const STATUS = { pass: 'Clears every gate', check: 'Something not confirmed', weak: 'Funding not guaranteed', cut: 'Fails a gate' };
 const phd = (r) => r.degree === 'PhD' || r.degree === 'PhD?';
-const base = (r) => r.bucket !== 'cut' && (r.short || r.locked || (r.bucket === 'pass' && phd(r)));
+const base = (r) => r.bucket !== 'cut' && (r.short || r.locked || r.late || (r.bucket === 'pass' && phd(r)));
 const best = (a, b) => BO[a.bucket] - BO[b.bucket] || (b.locked ? 1 : 0) - (a.locked ? 1 : 0) || (a.short || 9) - (b.short || 9) || a.inst.localeCompare(b.inst);
 const SORTS = { best, deadline: (a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || best(a, b),
   inst: (a, b) => a.inst.localeCompare(b.inst) || best(a, b), fee: (a, b) => (a.fee ?? 9999) - (b.fee ?? 9999) || best(a, b) };
@@ -238,6 +238,8 @@ function card(r, foot) {
     <div class="facts">${fact('Application fee', fee)}${fact('Fee waiver', WAIVE[r.fee_waiver] || ['Not confirmed', 'unk'])}${fact('GRE', GRE[r.gre] || GRE.unknown)}
       ${fact('English test', ENG[r.eng] || ['Not confirmed', 'unk'], r.eng ? '' : '')}${fact('Funding', visa && r.fund === 'unknown' ? visa : FUND[r.fund] || FUND.unknown, r.stipend ? String(r.stipend).slice(0, 40) : '')}${fact('Deadline', dl)}</div>
     ${r.online ? '<div class="flag">Online program: it cannot sponsor an F-1 visa.</div>' : ''}
+    ${r.late ? '<div class="flag"><b>Added 10 Oct.</b> A live PhD that was not among the first 350. Its facts have had a lighter read.</div>' : ''}
+    ${r.dup ? `<div class="flag">Looks like the same program as one already in play: ${esc(r.dup)}</div>` : ''}
     ${r.flags ? `<div class="flag">${esc(r.flags)}</div>` : ''}
     <details><summary>All details</summary><dl>${d}</dl></details>
     <div class="row">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Open the program page</a>` : ''}</div>
