@@ -165,7 +165,7 @@ function current() {
 }
 const GRE = { required: ['Required', 'bad'], optional: ['Optional', 'good'], not_required: ['Not required', 'good'], not_accepted: ['Not accepted', 'good'], unknown: ['Not confirmed', 'unk'] };
 const FUND = { guaranteed: ['Guaranteed', 'good'], most: ['Most students', 'good'], competitive: ['Competitive', 'unk'], none: ['None', 'bad'], unknown: ['Not confirmed', 'unk'] };
-const ENG = { waived_us_degree: ['Not needed (US degree)', 'good'], required: ['TOEFL/IELTS needed', 'bad'] };
+const ENG = { waived_us_degree: ['Not needed (US degree)', 'good'], required: ['TOEFL/IELTS needed', 'bad'], unclear: ['Unclear for you, see note', 'unk'] };
 const WAIVE = { yes_international: ['Yes, for you', 'good'], yes_some: ['Some waivers', 'unk'], need_based: ['Need-based', 'unk'], domestic_only: ['US applicants only', 'bad'], none: ['None', 'bad'] };
 const fmtDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 const fact = (label, [v, cls], sub) => `<div class="f ${cls || ''}"><small>${label}</small><b>${esc(v)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
@@ -176,7 +176,7 @@ function card(r) {
   const visa = r.online ? ['Online, no F-1', 'bad'] : null;
   const d = [['Why this status', (r.why || []).join('; ')], ['GRE, in their words', r.gre_quote], ['English test, in their words', r.eng_quote], ['English minimum', r.eng_min],
     ['Funding, in their words', r.fund_quote], ['Stipend', r.stipend], ['Years funded', r.fund_years], ['Deadline note', r.deadline_text],
-    ['Fee waiver, how', r.fee_waiver_how], ['Taking students for fall 2027', { yes: 'Yes', no: 'No', unknown: 'Not confirmed' }[r.admit]],
+    ['Fee waiver, how', r.fee_waiver_how], ['Fee note', r.fee_note], ['Taking students for fall 2027', { yes: 'Yes', no: 'No', unknown: 'Not confirmed' }[r.admit]],
     ['STEM field (for OPT)', r.stem === true ? 'Yes' : r.stem === false ? 'No' : ''], ['What to submit', r.materials], ['Faculty', r.faculty],
     ['Advisor rule', r.advisor_rule], ['AI rule for essays', r.ai_rule], ['Field', r.family], ['Notes', r.note],
     ['How this was read', r.read === 'page' ? 'On the official pages, Oct 2026' : r.read ? 'Partly or fully from search summaries. Open the page before you trust it.' : 'Earlier pass, not re-read this month']]
