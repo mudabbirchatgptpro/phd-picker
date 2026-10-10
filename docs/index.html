@@ -248,7 +248,7 @@ function card(r, foot) {
     <div class="facts">${fact('Application fee', fee)}${fact('Fee waiver', WAIVE[r.fee_waiver] || ['Not confirmed', 'unk'])}${fact('GRE', GRE[r.gre] || GRE.unknown)}
       ${fact('English test', ENG[r.eng] || ['Not confirmed', 'unk'], r.eng ? '' : '')}${fact('Funding', visa && r.fund === 'unknown' ? visa : FUND[r.fund] || FUND.unknown, r.stipend ? String(r.stipend).slice(0, 40) : '')}${fact('Deadline', dl)}</div>
     ${r.online ? '<div class="flag">Online program: it cannot sponsor an F-1 visa.</div>' : ''}
-    ${r.r2 ? `<div class="r2 ${r.r2.v}"><b>${r.sc ? `Score ${r.sc.score} of 100 · ranked ${r.r2.rank} of 227 · ` : ''}${V2[r.r2.v] || ''} · confidence ${esc(r.r2.conf || 'not stated')}</b>
+    ${r.r2 ? `<div class="r2 ${r.r2.v}"><b>${r.sc ? `Score ${r.sc.score} of 100 · ${rankOf(r)}` : ''}${V2[r.r2.v] || ''} · confidence ${esc(r.r2.conf || 'not stated')}</b>
       ${r.sc ? `<div class="subs">${SUBS.map(([k, t, m]) => `<span title="${esc(r.sc.why[k] || '')}">${t} <b>${r.sc.sub[k]}</b>/${m}</span>`).join('')}</div>` : ''}
       <div><b>Why drop:</b> ${esc(r.r2.drop)}</div><div><b>Why keep:</b> ${esc(r.r2.keep)}</div></div>` : ''}
     ${r.back ? '<div class="flag"><b>Brought back 10 Oct.</b> It had been excluded; a re-read of the official page did not support that.' + (r.fit0 != null ? ' Reader fit: ' + r.fit0 + ' of 5.' : '') + '</div>' : r.late ? '<div class="flag"><b>Added 10 Oct.</b> A live PhD that was not among the first 350. Its facts have had a lighter read.</div>' : ''}
@@ -373,6 +373,13 @@ function viewRank() {
       ${openK === r.key ? card(r, '') : ''}`).join('')}</div>
     <div class="row"><button class="btn primary" id="lock">Lock my list</button><span class="help">Makes a code to paste to Claude. You can lock again after another round.</span></div>
     <div id="lockbox" hidden></div>`;
+}
+// Rank among the programs still in play this round, leaving out the ones kept by his free-or-waiver rule.
+function rankOf(r) {
+  if (r.ap) return 'kept by your free or waiver rule · ';
+  const L = C.pool.filter((x) => x.sc && !x.ap);
+  if (!L.includes(r)) return '';
+  return `ranked ${L.filter((x) => x.sc.score > r.sc.score).length + 1} of ${L.length} still in play · `;
 }
 let seeded = false;
 function show() {
