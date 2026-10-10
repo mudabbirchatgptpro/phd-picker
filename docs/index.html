@@ -130,7 +130,7 @@ async function open(u, p) {
   const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(u.trim().toLowerCase() + ':' + p), 'PBKDF2', false, ['deriveBits']);
   const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: hex('d354727ac2f35e0ada6e1e2c217f39c9'), iterations: 100000, hash: 'SHA-256' }, km, 384));
   const key = await crypto.subtle.importKey('raw', bits.slice(0, 32), 'AES-CBC', false, ['decrypt']);
-  const enc = await (await fetch('data.enc')).arrayBuffer();
+  const enc = await (await fetch('data.enc', { cache: 'no-store' })).arrayBuffer();
   const plain = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: bits.slice(32) }, key, enc);
   P = JSON.parse(new TextDecoder().decode(plain));
   try { localStorage.setItem('phd-picker-login', JSON.stringify([u, p])); } catch (e) {}
@@ -389,10 +389,10 @@ function show() {
       }
       S.round = 3; S.m3 = 1; sortBy = 'weak'; view = 'go'; save();
     }
-    if (!S.m4) {
+    if (!S.m5 && P.some((r) => r.ap)) {
       // His rule: apply to every program that is free or has a waiver open to him. Those are kept for him.
       for (const r of P) if (r.ap) { S.d[r.key] = 'keep'; delete S.dr[r.key]; }
-      S.m4 = 1; save();
+      S.m5 = 1; save();
     }
   }
   compute();
