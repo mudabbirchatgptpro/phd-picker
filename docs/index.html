@@ -164,6 +164,7 @@ try {
   else for (const [k, v] of Object.entries(picks)) { S.d[k] = v === 'no' ? 'drop' : 'keep'; if (v === 'no') S.dr[k] = 1; }
 } catch (e) {}
 if (S.round >= 2) sortBy = 'weak';
+if (S.rules.late === undefined) S.rules.late = true;
 function save() {
   try { localStorage.setItem('phd-picker-state', JSON.stringify(S)); $('#saved').textContent = 'Saved ' + new Date().toLocaleTimeString(); }
   catch (e) { $('#saved').textContent = 'NOT SAVED: this browser blocks storage'; }
@@ -173,6 +174,7 @@ const RULES = [
   ['eng', 'Drop programs that need TOEFL or IELTS from me', (r) => r.eng === 'required', 'needs TOEFL or IELTS'],
   ['fund', 'Drop programs where funding is competitive, not promised', (r) => r.fund === 'competitive' || r.fund === 'none', 'funding is not promised'],
   ['check', 'Drop programs with a key fact still not confirmed', (r) => r.bucket === 'check', 'a key fact is not confirmed'],
+  ['late', 'Hold the programs added on 10 Oct for a later round (they have no score yet)', (r) => r.late && !r.sc, 'added 10 Oct, held for a later round'],
 ];
 const FEES = { any: 'Any fee', 0: 'Free, or the fee can be waived for me', 50: 'Up to $50', 75: 'Up to $75', 100: 'Up to $100' };
 const feeFail = (r, f) => f !== 'any' && r.fee != null && r.fee > +f && r.fee_waiver !== 'yes_international';
@@ -294,8 +296,7 @@ function viewGo() {
       <select id="sort">${SORT_OPTS}</select>
       ${mode === 'list' ? `<select id="showin"><option value="todo">Left to decide</option><option value="keep">Kept</option><option value="all">Both</option></select><input type="search" id="q" placeholder="Search university or program">` : ''}</div>
     <div class="bar"><i style="width:${total ? Math.round(100 * done / total) : 0}%"></i></div>
-    <div class="help">${done} of ${total} decided. ${C.kept.length} kept.</div>
-    ${C.kept.length && C.todo.length ? `<div class="row"><button class="btn" data-again="1">Start round ${S.round + 1}: go through my ${C.kept.length} kept again, weakest first</button></div>` : ''}`;
+    <div class="help">${done} of ${total} decided. ${C.kept.length} kept.</div>`;
   if (!C.todo.length && (mode === 'one' || showIn === 'todo')) return head + `<div class="panel"><h2>Round ${S.round} is done</h2>
       <span>You kept <b>${C.kept.length}</b> programs at ${new Set(C.kept.map((r) => r.inst)).size} universities.</span>
       <span class="help">Too many? Go through only the kept ones again. Each round the list gets shorter.</span>
@@ -351,7 +352,10 @@ function viewRank() {
 function show() {
   compute();
   const y = window.scrollY;
-  $('#view').innerHTML = { narrow: viewNarrow, go: viewGo, rank: viewRank, out: viewOut }[view]();
+  const banner = S.round === 1 && C.kept.length ? `<div class="panel" style="border:2px solid var(--go)"><h2>Round 2 is ready</h2>
+    <span>Your ${C.kept.length} kept programs now have a score out of 100 and a case to drop or keep. Round 2 shows them one at a time, lowest score first.</span>
+    <div class="row"><button class="btn primary" data-again="go">Start round 2</button></div></div>` : '';
+  $('#view').innerHTML = banner + { narrow: viewNarrow, go: viewGo, rank: viewRank, out: viewOut }[view]();
   if ($('#sort')) $('#sort').value = sortBy;
   if ($('#showin')) $('#showin').value = showIn;
   if ($('#q')) $('#q').value = q;
@@ -379,7 +383,7 @@ document.addEventListener('click', (e) => {
   }
   else if ((b = on('[data-again]'))) {
     S.round++; for (const r of C.kept) delete S.d[r.key];
-    hist = []; skipped = []; sortBy = 'weak'; view = 'narrow'; save(); show(); window.scrollTo(0, 0);
+    hist = []; skipped = []; sortBy = 'weak'; mode = 'one'; view = b.dataset.again === 'go' ? 'go' : 'narrow'; save(); show(); window.scrollTo(0, 0);
   }
   else if ((b = on('[data-ord]'))) { S.rank = [...C.kept].sort(SORTS[b.dataset.ord]).map((r) => r.key); save(); show(); }
   else if ((b = on('[data-mv]'))) {
