@@ -242,7 +242,7 @@ function card(r, foot) {
     .filter((x) => x[1]).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
   const link = r.url_adm || r.url;
   return `<div class="card ${mine}" data-k="${r.key}">
-    <div class="head"><div><div class="uni">${esc(r.inst)}${r.state ? ', ' + esc(r.state) : ''}${r.fee === 0 ? '<span class="free">FREE TO APPLY</span>' : ''}</div>
+    <div class="head"><div><div class="uni">${esc(r.inst)}${r.state ? ', ' + esc(r.state) : ''}${r.fee === 0 ? '<span class="free">FREE TO APPLY</span>' : ''}${r.ap && r.fee !== 0 ? '<span class="free">FEE WAIVER OPEN TO YOU</span>' : ''}</div>
       <div class="prog">${esc(r.program)}${r.locked ? ' · <b>in your earlier locked 14</b>' : ''}</div></div>
       <span class="pill ${r.bucket}">${STATUS[r.bucket]}</span></div>
     <div class="facts">${fact('Application fee', fee)}${fact('Fee waiver', WAIVE[r.fee_waiver] || ['Not confirmed', 'unk'])}${fact('GRE', GRE[r.gre] || GRE.unknown)}
@@ -388,6 +388,11 @@ function show() {
         else if (S.d[r.key] === 'keep') delete S.d[r.key];
       }
       S.round = 3; S.m3 = 1; sortBy = 'weak'; view = 'go'; save();
+    }
+    if (!S.m4) {
+      // His rule: apply to every program that is free or has a waiver open to him. Those are kept for him.
+      for (const r of P) if (r.ap) { S.d[r.key] = 'keep'; delete S.dr[r.key]; }
+      S.m4 = 1; save();
     }
   }
   compute();
