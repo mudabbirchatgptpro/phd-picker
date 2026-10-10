@@ -253,6 +253,7 @@ function card(r, foot) {
       <div><b>Why drop:</b> ${esc(r.r2.drop)}</div><div><b>Why keep:</b> ${esc(r.r2.keep)}</div></div>` : ''}
     ${r.back ? '<div class="flag"><b>Brought back 10 Oct.</b> It had been excluded; a re-read of the official page did not support that.' + (r.fit0 != null ? ' Reader fit: ' + r.fit0 + ' of 5.' : '') + '</div>' : r.late ? '<div class="flag"><b>Added 10 Oct.</b> A live PhD that was not among the first 350. Its facts have had a lighter read.</div>' : ''}
     ${r.dup ? `<div class="flag">Looks like the same program as one already in play: ${esc(r.dup)}</div>` : ''}
+    ${r.deep ? `<div class="flag"><b>Second read, 10 Oct.</b> Deciding facts were re-read on official pages.${r.deep.length ? ' What changed: ' + r.deep.map(esc).join(' ') : ''}</div>` : ''}
     ${r.flags ? `<div class="flag">${esc(r.flags)}</div>` : ''}
     <details><summary>All details</summary><dl>${d}</dl></details>
     <div class="row">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Open the program page</a>` : ''}</div>
