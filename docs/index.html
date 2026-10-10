@@ -174,6 +174,7 @@ const feeFail = (r, f) => f !== 'any' && r.fee != null && r.fee > +f && r.fee_wa
 function ruleWhy(r) {
   for (const [id, , fn, why] of RULES) if (S.rules[id] && fn(r)) return why;
   if (feeFail(r, S.rules.fee)) return 'fee is over your limit';
+  if ((S.rules.gre || []).includes(r.gre || 'unknown')) return 'GRE rule you switched off';
   if (S.rules.fam.includes(r.family)) return 'field you switched off';
   return '';
 }
@@ -267,6 +268,8 @@ function viewNarrow() {
       ${RULES.map(([id, t, fn]) => `<label class="rule"><input type="checkbox" data-rule="${id}" ${S.rules[id] ? 'checked' : ''}><span>${t}<small>${open.filter(fn).length} programs</small></span></label>`).join('')}
       <label class="rule"><input type="checkbox" data-rule="one" ${S.rules.one ? 'checked' : ''}><span>Keep only the strongest program at each university<small>Leaves one per university</small></span></label>
       <label>Application fee: <select id="r-fee">${Object.entries(FEES).map(([v, t]) => `<option value="${v}" ${String(S.rules.fee) === v ? 'selected' : ''}>${t}${v === 'any' ? '' : ' (removes ' + open.filter((r) => feeFail(r, v)).length + ')'}</option>`).join('')}</select></label></div>
+    <div class="panel"><h2>GRE</h2><span class="help">Untick a GRE rule to remove those programs. Programs that require the GRE are already out; they sit under Left out, Failed a gate.</span>
+      ${[['not_required', 'Not required'], ['not_accepted', 'Not accepted (they will not look at it)'], ['optional', 'Optional (accepted if you send it)'], ['unknown', 'Not confirmed yet']].map(([v, t]) => `<label class="rule"><input type="checkbox" data-gre="${v}" ${(S.rules.gre || []).includes(v) ? '' : 'checked'}><span>${t} <small style="display:inline">${open.filter((r) => (r.gre || 'unknown') === v).length}</small></span></label>`).join('')}</div>
     <div class="panel"><h2>Fields</h2><span class="help">Untick a field to remove it.</span>
       ${Object.keys(fams).sort((a, b) => fams[b] - fams[a]).map((f) => `<label class="rule"><input type="checkbox" data-fam="${esc(f)}" ${S.rules.fam.includes(f) ? '' : 'checked'}><span>${esc(f)} <small style="display:inline">${fams[f]}</small></span></label>`).join('')}</div>
     <button class="btn primary" data-v="go">Next: go through the ${C.todo.length} left to decide</button>`;
@@ -391,6 +394,7 @@ document.addEventListener('change', (e) => {
   if (t.dataset.rule) S.rules[t.dataset.rule] = t.checked;
   else if (t.id === 'r-fee') S.rules.fee = t.value;
   else if (t.dataset.fam) S.rules.fam = t.checked ? S.rules.fam.filter((f) => f !== t.dataset.fam) : [...S.rules.fam, t.dataset.fam];
+  else if (t.dataset.gre) S.rules.gre = t.checked ? (S.rules.gre || []).filter((g) => g !== t.dataset.gre) : [...(S.rules.gre || []), t.dataset.gre];
   else if (t.id === 'n') S.n = Math.max(1, +t.value || 1);
   else if (t.id === 'sort') { sortBy = t.value; show(); return; }
   else if (t.id === 'showin') { showIn = t.value; show(); return; }
@@ -410,7 +414,7 @@ document.addEventListener('drop', (e) => {
 function lock() {
   const R = ranked(), n = Math.max(1, S.n | 0), box = $('#lockbox');
   const line = (r, i) => `${i + 1} | ${r.key} | ${r.inst} | ${r.program}`;
-  const rules = [...RULES.filter(([id]) => S.rules[id]).map((x) => x[1]), S.rules.one ? 'One per university' : '', S.rules.fee !== 'any' ? 'Fee: ' + FEES[S.rules.fee] : '', ...S.rules.fam.map((f) => 'Field off: ' + f)].filter(Boolean);
+  const rules = [...RULES.filter(([id]) => S.rules[id]).map((x) => x[1]), S.rules.one ? 'One per university' : '', S.rules.fee !== 'any' ? 'Fee: ' + FEES[S.rules.fee] : '', ...(S.rules.gre || []).map((g) => 'GRE off: ' + g), ...S.rules.fam.map((f) => 'Field off: ' + f)].filter(Boolean);
   const text = ['PHD LIST LOCK ' + new Date().toISOString().slice(0, 16) + ' round ' + S.round, 'RULES: ' + (rules.join('; ') || 'none'),
     'APPLY, ranked (' + Math.min(n, R.length) + ')', ...R.slice(0, n).map(line), 'RESERVE, ranked (' + Math.max(0, R.length - n) + ')', ...R.slice(n).map((r, i) => line(r, i + n)),
     'UNDECIDED (' + C.todo.length + ')', C.todo.map((r) => r.key).join(' '), 'DROPPED (' + C.dropped.length + ')', C.dropped.map((r) => r.key).join(' ')].join('\n');
