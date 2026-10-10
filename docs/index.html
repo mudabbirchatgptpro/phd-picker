@@ -63,6 +63,33 @@ details dt{color:var(--mute)}details dd{margin:0;overflow-wrap:anywhere}
 #lockbox textarea{width:100%;height:150px;font:13px/1.4 ui-monospace,Menlo,monospace;padding:8px;border:1px solid var(--line);border-radius:8px}
 #lockbox ol{margin:0;padding-left:22px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.steps{display:flex;flex-wrap:wrap;gap:8px}
+.step{flex:1;min-width:150px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);cursor:pointer;text-align:left}
+.step b{display:block}.step small{color:var(--mute)}
+.step[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}.step[aria-pressed=true] small{color:#ddd}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.panel h2{font-size:17px;margin:0}
+.rule{display:flex;gap:10px;align-items:flex-start}.rule input{margin-top:5px}.rule small{color:var(--mute);display:block}
+.big{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{padding:8px 12px;border:0;background:#fff;cursor:pointer}.seg button.on{background:var(--ink);color:#fff}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:var(--go)}
+.act{display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:0;background:var(--bg);padding:10px 0}
+.act button{flex:1;min-width:70px;padding:14px 6px;border-radius:10px;border:2px solid var(--line);background:#fff;font-weight:700;font-size:17px;cursor:pointer}
+.act .k{background:var(--go);border-color:var(--go);color:#fff}.act .d{background:var(--no);border-color:var(--no);color:#fff}
+.act small{display:block;font-weight:400;opacity:.8;font-size:12px}
+.rk{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;gap:12px;align-items:center;cursor:grab}
+.rk.over{border-color:var(--acc);box-shadow:0 -3px 0 var(--acc)}
+.rk.res{opacity:.75}
+.num{font-size:20px;font-weight:700;min-width:34px;text-align:center;font-variant-numeric:tabular-nums}
+.rk-main{flex:1;min-width:0;cursor:pointer}
+.mini{font-size:13.5px;color:var(--mute);margin-top:3px}.mini .good{color:var(--go)}.mini .bad{color:var(--no)}.mini .unk{color:var(--may)}
+.rk-btn{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.rk-btn button{padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer}
+.cutline{border-top:3px dashed var(--ink);padding-top:6px;font-weight:600}
+#n{width:70px;padding:8px;border:1px solid var(--line);border-radius:8px}
+@media(max-width:600px){.rk{flex-wrap:wrap}.rk-btn{width:100%;justify-content:flex-start}}
 </style>
 </head>
 <body>
@@ -76,36 +103,16 @@ details dt{color:var(--mute)}details dd{margin:0;overflow-wrap:anywhere}
 
 <div id="app" hidden>
   <div id="top">
-    <span><b id="n-apply">0</b> Apply</span>
-    <span><b id="n-maybe">0</b> Maybe</span>
-    <span><b id="n-no">0</b> No</span>
-    <span>Fees: <b id="n-fee">$0</b></span>
+    <span>Round <b id="n-round">1</b></span>
+    <span><b id="n-todo">0</b> to decide</span>
+    <span><b id="n-keep">0</b> kept</span>
+    <span><b id="n-drop">0</b> dropped</span>
     <span class="sp"></span>
     <span id="saved"></span>
-    <button class="btn" id="lock">Lock my list</button>
   </div>
   <main>
-    <h1>Choose your PhD programs</h1>
-    <p class="help">Each card is one program. Press <b>Apply</b>, <b>Maybe</b> or <b>No</b>. Every press is saved in this browser straight away. When you are done, press <b>Lock my list</b> and send the code to Claude.</p>
-    <div id="lockbox" hidden></div>
-    <div class="tabs" id="tabs"></div>
-    <div class="filters">
-      <input type="search" id="q" placeholder="Search university or program">
-      <select id="sort">
-        <option value="best">Sort: strongest first</option>
-        <option value="deadline">Sort: earliest deadline</option>
-        <option value="inst">Sort: university A to Z</option>
-        <option value="fee">Sort: lowest fee</option>
-      </select>
-      <label><input type="checkbox" id="f-gre"> No GRE</label>
-      <label><input type="checkbox" id="f-eng"> No TOEFL/IELTS for me</label>
-      <label><input type="checkbox" id="f-fund"> Funded (guaranteed or most)</label>
-      <label><input type="checkbox" id="f-fee"> Free or fee can be waived</label>
-      <label><input type="checkbox" id="f-todo"> Hide ones I decided</label>
-    </div>
-    <div class="help"><b id="shown">0</b> programs shown</div>
-    <div id="list"></div>
-    <button class="btn" id="more" hidden>Show 30 more</button>
+    <div class="steps" id="steps"></div>
+    <div id="view" style="display:flex;flex-direction:column;gap:14px"></div>
   </main>
 </div>
 
@@ -134,43 +141,84 @@ $('#gate').addEventListener('submit', (e) => {
 });
 try { const l = JSON.parse(localStorage.getItem('phd-picker-login')); if (l) open(l[0], l[1]).catch(() => {}); } catch (e) {}
 
+
 const BO = { pass: 0, check: 1, weak: 2, cut: 3 };
 const STATUS = { pass: 'Clears every gate', check: 'Something not confirmed', weak: 'Funding not guaranteed', cut: 'Fails a gate' };
 const phd = (r) => r.degree === 'PhD' || r.degree === 'PhD?';
-const pk = (r) => picks[r.key];
-const TABS = [
-  ['Best picks', (r) => r.bucket !== 'cut' && (r.short || r.locked || (r.bucket === 'pass' && phd(r)))],
-  ['Not decided yet', (r) => !pk(r) && r.bucket !== 'cut' && (r.short || r.locked || (r.bucket === 'pass' && phd(r)))],
-  ['My Apply', (r) => pk(r) === 'apply'],
-  ['My Maybe', (r) => pk(r) === 'maybe'],
-  ['My No', (r) => pk(r) === 'no'],
-  ['Everything still alive', (r) => r.bucket !== 'cut'],
-  ['Failed a gate', (r) => r.bucket === 'cut'],
-];
-const noGre = (r) => ['not_required', 'not_accepted', 'optional'].includes(r.gre);
-const freeFee = (r) => r.fee === 0 || r.fee_waiver === 'yes_international';
-function current() {
-  const q = $('#q').value.trim().toLowerCase();
-  let rows = P.filter(TABS[tab][1]).filter((r) =>
-    (!q || (r.inst + ' ' + r.program + ' ' + (r.state || '')).toLowerCase().includes(q)) &&
-    (!$('#f-gre').checked || noGre(r)) && (!$('#f-eng').checked || r.eng === 'waived_us_degree') &&
-    (!$('#f-fund').checked || r.fund === 'guaranteed' || r.fund === 'most') && (!$('#f-fee').checked || freeFee(r)) &&
-    (!$('#f-todo').checked || !pk(r)));
-  const s = $('#sort').value;
-  const best = (a, b) => BO[a.bucket] - BO[b.bucket] || (b.locked ? 1 : 0) - (a.locked ? 1 : 0) || (a.short || 9) - (b.short || 9) || a.inst.localeCompare(b.inst);
-  rows.sort(s === 'deadline' ? (a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || best(a, b)
-    : s === 'inst' ? (a, b) => a.inst.localeCompare(b.inst) || best(a, b)
-    : s === 'fee' ? (a, b) => (a.fee ?? 9999) - (b.fee ?? 9999) || best(a, b) : best);
-  return rows;
+const base = (r) => r.bucket !== 'cut' && (r.short || r.locked || (r.bucket === 'pass' && phd(r)));
+const best = (a, b) => BO[a.bucket] - BO[b.bucket] || (b.locked ? 1 : 0) - (a.locked ? 1 : 0) || (a.short || 9) - (b.short || 9) || a.inst.localeCompare(b.inst);
+const SORTS = { best, deadline: (a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || best(a, b),
+  inst: (a, b) => a.inst.localeCompare(b.inst) || best(a, b), fee: (a, b) => (a.fee ?? 9999) - (b.fee ?? 9999) || best(a, b) };
+const SORT_OPTS = '<option value="best">Strongest first</option><option value="deadline">Earliest deadline</option><option value="inst">University A to Z</option><option value="fee">Lowest fee</option>';
+
+// S.d: key -> 'keep' | 'drop'. S.dr: round a program was dropped in. S.extra: programs he added from outside the best picks.
+let S = { round: 1, rules: { fee: 'any', fam: [] }, d: {}, dr: {}, extra: [], rank: [], n: 12 };
+let view = 'narrow', mode = 'one', sub = 'dropped', sortBy = 'best', showIn = 'todo', q = '', hist = [], skipped = [], openK = '', dragK = '';
+try {
+  const s = JSON.parse(localStorage.getItem('phd-picker-state'));
+  if (s) S = s;
+  else for (const [k, v] of Object.entries(picks)) { S.d[k] = v === 'no' ? 'drop' : 'keep'; if (v === 'no') S.dr[k] = 1; }
+} catch (e) {}
+function save() {
+  try { localStorage.setItem('phd-picker-state', JSON.stringify(S)); $('#saved').textContent = 'Saved ' + new Date().toLocaleTimeString(); }
+  catch (e) { $('#saved').textContent = 'NOT SAVED: this browser blocks storage'; }
 }
+
+const RULES = [
+  ['eng', 'Drop programs that need TOEFL or IELTS from me', (r) => r.eng === 'required', 'needs TOEFL or IELTS'],
+  ['fund', 'Drop programs where funding is competitive, not promised', (r) => r.fund === 'competitive' || r.fund === 'none', 'funding is not promised'],
+  ['check', 'Drop programs with a key fact still not confirmed', (r) => r.bucket === 'check', 'a key fact is not confirmed'],
+];
+const FEES = { any: 'Any fee', 0: 'Free, or the fee can be waived for me', 50: 'Up to $50', 75: 'Up to $75', 100: 'Up to $100' };
+const feeFail = (r, f) => f !== 'any' && r.fee != null && r.fee > +f && r.fee_waiver !== 'yes_international';
+function ruleWhy(r) {
+  for (const [id, , fn, why] of RULES) if (S.rules[id] && fn(r)) return why;
+  if (feeFail(r, S.rules.fee)) return 'fee is over your limit';
+  if (S.rules.fam.includes(r.family)) return 'field you switched off';
+  return '';
+}
+// One pass over the data: who is in the pool this round, and why the rest are out.
+let C = {};
+function compute() {
+  const cand = P.filter((r) => S.d[r.key] !== 'drop' && (base(r) || S.extra.includes(r.key)));
+  const safe = (r) => S.d[r.key] === 'keep' || S.extra.includes(r.key);
+  const why = new Map();
+  for (const r of cand) { const w = !safe(r) && ruleWhy(r); if (w) why.set(r.key, w); }
+  if (S.rules.one) {
+    const seen = new Set();
+    for (const r of cand.filter((r) => !why.has(r.key)).sort((a, b) => (safe(b) ? 1 : 0) - (safe(a) ? 1 : 0) || best(a, b))) {
+      const u = r.inst + '|' + r.state;
+      if (seen.has(u) && !safe(r)) why.set(r.key, 'not the top pick at this university');
+      seen.add(u);
+    }
+  }
+  const pool = cand.filter((r) => !why.has(r.key));
+  C = { cand, why, pool, removed: cand.filter((r) => why.has(r.key)), kept: pool.filter((r) => S.d[r.key] === 'keep'), todo: pool.filter((r) => !S.d[r.key]),
+    dropped: P.filter((r) => S.d[r.key] === 'drop') };
+  $('#n-round').textContent = S.round; $('#n-todo').textContent = C.todo.length; $('#n-keep').textContent = C.kept.length; $('#n-drop').textContent = C.dropped.length;
+  const sm = { narrow: C.pool.length + ' programs in play', go: C.todo.length + ' left to decide', rank: C.kept.length + ' kept', out: (C.dropped.length + C.removed.length) + ' set aside' };
+  $('#steps').innerHTML = [['narrow', '1. Set rules'], ['go', '2. Keep or drop'], ['rank', '3. Rank and lock'], ['out', 'Left out']]
+    .map(([id, t]) => `<button class="step" data-v="${id}" aria-pressed="${id === view}"><b>${t}</b><small>${sm[id]}</small></button>`).join('');
+}
+function ranked() {
+  const pos = new Map(S.rank.map((k, i) => [k, i]));
+  return [...C.kept].sort((a, b) => (pos.has(a.key) ? pos.get(a.key) : 1e9) - (pos.has(b.key) ? pos.get(b.key) : 1e9) || best(a, b));
+}
+function decide(k, v) {
+  hist.push([k, S.d[k], S.dr[k]]);
+  if (v) S.d[k] = v; else delete S.d[k];
+  if (v === 'drop') S.dr[k] = S.round; else delete S.dr[k];
+  save(); show();
+}
+
 const GRE = { required: ['Required', 'bad'], optional: ['Optional', 'good'], not_required: ['Not required', 'good'], not_accepted: ['Not accepted', 'good'], unknown: ['Not confirmed', 'unk'] };
 const FUND = { guaranteed: ['Guaranteed', 'good'], most: ['Most students', 'good'], competitive: ['Competitive', 'unk'], none: ['None', 'bad'], unknown: ['Not confirmed', 'unk'] };
 const ENG = { waived_us_degree: ['Not needed (US degree)', 'good'], required: ['TOEFL/IELTS needed', 'bad'], unclear: ['Unclear for you, see note', 'unk'] };
 const WAIVE = { yes_international: ['Yes, for you', 'good'], yes_some: ['Some waivers', 'unk'], need_based: ['Need-based', 'unk'], domestic_only: ['US applicants only', 'bad'], none: ['None', 'bad'] };
 const fmtDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 const fact = (label, [v, cls], sub) => `<div class="f ${cls || ''}"><small>${label}</small><b>${esc(v)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
-function card(r) {
-  const mine = pk(r) || '';
+function card(r, foot) {
+  const mine = { keep: 'apply', drop: 'no' }[S.d[r.key]] || '';
   const fee = r.fee === 0 ? ['Free', 'good'] : r.fee != null ? ['$' + r.fee, ''] : ['Not confirmed', 'unk'];
   const dl = r.deadline ? [fmtDate(r.deadline), ''] : r.deadline_text ? ['Last cycle, see details', 'unk'] : ['Not confirmed', 'unk'];
   const visa = r.online ? ['Online, no F-1', 'bad'] : null;
@@ -192,65 +240,190 @@ function card(r) {
     ${r.flags ? `<div class="flag">${esc(r.flags)}</div>` : ''}
     <details><summary>All details</summary><dl>${d}</dl></details>
     <div class="row">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Open the program page</a>` : ''}</div>
-    <div class="pick"><button class="a ${mine === 'apply' ? 'on' : ''}" data-p="apply">Apply</button><button class="m ${mine === 'maybe' ? 'on' : ''}" data-p="maybe">Maybe</button><button class="n ${mine === 'no' ? 'on' : ''}" data-p="no">No</button></div>
+    ${foot}
   </div>`;
 }
-function counts() {
-  const by = { apply: [], maybe: [], no: [] };
-  for (const r of P) if (pk(r)) by[pk(r)].push(r);
-  $('#n-apply').textContent = by.apply.length; $('#n-maybe').textContent = by.maybe.length; $('#n-no').textContent = by.no.length;
-  const unk = by.apply.filter((r) => r.fee == null).length;
-  $('#n-fee').textContent = '$' + by.apply.reduce((s, r) => s + (r.fee || 0), 0).toLocaleString() + (unk ? ` + ${unk} not confirmed` : '');
-  $('#tabs').innerHTML = TABS.map((t, i) => `<button class="tab" data-t="${i}" aria-pressed="${i === tab}">${t[0]}<span>${P.filter(t[1]).length}</span></button>`).join('');
-  return by;
+
+const mini = (r) => {
+  const sp = ([v, c]) => `<span class="${c || ''}">${esc(v)}</span>`;
+  return [sp(r.fee === 0 ? ['Free', 'good'] : r.fee != null ? ['$' + r.fee, ''] : ['Fee not confirmed', 'unk']),
+    sp(r.gre === 'unknown' || !r.gre ? ['GRE not confirmed', 'unk'] : ['No GRE', 'good']),
+    sp({ waived_us_degree: ['No English test', 'good'], required: ['TOEFL/IELTS needed', 'bad'] }[r.eng] || ['English test unclear', 'unk']),
+    sp(['Funding: ' + (FUND[r.fund] || FUND.unknown)[0].toLowerCase(), (FUND[r.fund] || FUND.unknown)[1]]),
+    sp(r.deadline ? ['Due ' + fmtDate(r.deadline), ''] : ['Deadline not confirmed', 'unk'])].join(' · ');
+};
+const pickBtns = (r) => `<div class="pick"><button class="n ${S.d[r.key] === 'drop' ? 'on' : ''}" data-p="drop">Drop</button><button class="a ${S.d[r.key] === 'keep' ? 'on' : ''}" data-p="keep">Keep</button></div>`;
+
+function viewNarrow() {
+  const open = C.cand.filter((r) => S.d[r.key] !== 'keep' && !S.extra.includes(r.key));
+  const fams = {};
+  for (const r of open) fams[r.family] = (fams[r.family] || 0) + 1;
+  for (const f of S.rules.fam) fams[f] = fams[f] || 0;
+  return `<h1>Round ${S.round}: set your rules</h1>
+    <p class="help">Each rule removes a whole group in one press, so you do not have to go card by card. Nothing is lost: removed programs wait under <b>Left out</b>, and programs you already kept stay.</p>
+    <div class="panel"><div class="big">${C.pool.length} programs at ${new Set(C.pool.map((r) => r.inst)).size} universities</div>
+      <span class="help">in play this round. ${C.removed.length} removed by your rules. ${C.kept.length} already kept.</span></div>
+    <div class="panel"><h2>Rules</h2>
+      ${RULES.map(([id, t, fn]) => `<label class="rule"><input type="checkbox" data-rule="${id}" ${S.rules[id] ? 'checked' : ''}><span>${t}<small>${open.filter(fn).length} programs</small></span></label>`).join('')}
+      <label class="rule"><input type="checkbox" data-rule="one" ${S.rules.one ? 'checked' : ''}><span>Keep only the strongest program at each university<small>Leaves one per university</small></span></label>
+      <label>Application fee: <select id="r-fee">${Object.entries(FEES).map(([v, t]) => `<option value="${v}" ${String(S.rules.fee) === v ? 'selected' : ''}>${t}${v === 'any' ? '' : ' (removes ' + open.filter((r) => feeFail(r, v)).length + ')'}</option>`).join('')}</select></label></div>
+    <div class="panel"><h2>Fields</h2><span class="help">Untick a field to remove it.</span>
+      ${Object.keys(fams).sort((a, b) => fams[b] - fams[a]).map((f) => `<label class="rule"><input type="checkbox" data-fam="${esc(f)}" ${S.rules.fam.includes(f) ? '' : 'checked'}><span>${esc(f)} <small style="display:inline">${fams[f]}</small></span></label>`).join('')}</div>
+    <button class="btn primary" data-v="go">Next: go through the ${C.todo.length} left to decide</button>`;
 }
-function render() {
-  counts();
-  const rows = current();
-  $('#shown').textContent = rows.length;
-  $('#list').innerHTML = rows.slice(0, limit).map(card).join('') || '<p class="help">Nothing here.</p>';
-  $('#list').style.cssText = 'display:flex;flex-direction:column;gap:12px';
+function viewGo() {
+  const total = C.pool.length, done = total - C.todo.length;
+  const head = `<h1>Round ${S.round}: keep or drop</h1>
+    <div class="filters"><span class="seg"><button data-mode="one" class="${mode === 'one' ? 'on' : ''}">One at a time</button><button data-mode="list" class="${mode === 'list' ? 'on' : ''}">As a list</button></span>
+      <select id="sort">${SORT_OPTS}</select>
+      ${mode === 'list' ? `<select id="showin"><option value="todo">Left to decide</option><option value="keep">Kept</option><option value="all">Both</option></select><input type="search" id="q" placeholder="Search university or program">` : ''}</div>
+    <div class="bar"><i style="width:${total ? Math.round(100 * done / total) : 0}%"></i></div>
+    <div class="help">${done} of ${total} decided. ${C.kept.length} kept.</div>`;
+  if (!C.todo.length && (mode === 'one' || showIn === 'todo')) return head + `<div class="panel"><h2>Round ${S.round} is done</h2>
+      <span>You kept <b>${C.kept.length}</b> programs at ${new Set(C.kept.map((r) => r.inst)).size} universities.</span>
+      <span class="help">Too many? Go through only the kept ones again. Each round the list gets shorter.</span>
+      <div class="row"><button class="btn primary" data-again="1" ${C.kept.length ? '' : 'disabled'}>Go again with these ${C.kept.length} (round ${S.round + 1})</button>
+      <button class="btn" data-v="rank">Rank them</button></div></div>`;
+  if (mode === 'one') {
+    const r = [...C.todo].sort((a, b) => skipped.indexOf(a.key) - skipped.indexOf(b.key) || SORTS[sortBy](a, b))[0];
+    const sib = C.pool.filter((x) => x.inst === r.inst && x.key !== r.key);
+    return head + card(r, '') + (sib.length ? `<div class="help">Also in play at this university: ${sib.map((x) => esc(x.program) + (S.d[x.key] ? ' (kept)' : '')).join('; ')}</div>` : '') +
+      `<div class="act" data-k="${r.key}"><button class="d" data-do="drop">Drop<small>left arrow</small></button><button data-do="skip">Later<small>down arrow</small></button>
+      <button class="k" data-do="keep">Keep<small>right arrow</small></button><button data-do="undo" ${hist.length ? '' : 'disabled'}>Undo<small>Z</small></button></div>`;
+  }
+  return head + '<div id="list"></div><button class="btn" id="more" hidden>Show 30 more</button>';
+}
+function fillList() {
+  const el = $('#list'); if (!el || view === 'rank') return;
+  const src = view === 'go' ? (showIn === 'todo' ? C.todo : showIn === 'keep' ? C.kept : C.pool)
+    : { dropped: C.dropped, rules: C.removed, alive: P.filter((r) => r.bucket !== 'cut' && !base(r) && !S.extra.includes(r.key) && !S.d[r.key]), cut: P.filter((r) => r.bucket === 'cut' && !S.extra.includes(r.key) && !S.d[r.key]) }[sub];
+  const rows = src.filter((r) => !q || (r.inst + ' ' + r.program + ' ' + (r.state || '')).toLowerCase().includes(q)).sort(SORTS[sortBy]);
+  const foot = (r) => view === 'go' ? pickBtns(r)
+    : sub === 'dropped' ? `<div class="flag">You dropped this in round ${S.dr[r.key] || 1}.</div><div class="pick"><button data-p="">Bring back</button></div>`
+    : sub === 'rules' ? `<div class="flag">Removed by your rule: ${C.why.get(r.key)}.</div><div class="pick"><button data-p="keep">Keep anyway</button></div>`
+    : `<div class="pick"><button data-p="add">Add to my list</button></div>`;
+  el.style.cssText = 'display:flex;flex-direction:column;gap:12px';
+  el.innerHTML = rows.slice(0, limit).map((r) => card(r, foot(r))).join('') || '<p class="help">Nothing here.</p>';
   $('#more').hidden = rows.length <= limit;
 }
-function save() {
-  try { localStorage.setItem('phd-picker-picks', JSON.stringify(picks)); $('#saved').textContent = 'Saved ' + new Date().toLocaleTimeString(); }
-  catch (e) { $('#saved').textContent = 'NOT SAVED: this browser blocks storage'; }
+function viewOut() {
+  const n = { dropped: C.dropped.length, rules: C.removed.length, alive: P.filter((r) => r.bucket !== 'cut' && !base(r) && !S.extra.includes(r.key) && !S.d[r.key]).length, cut: P.filter((r) => r.bucket === 'cut' && !S.extra.includes(r.key) && !S.d[r.key]).length };
+  const t = { dropped: 'Dropped by me', rules: 'Removed by my rules', alive: 'Other programs still alive', cut: 'Failed a gate' };
+  return `<h1>Left out</h1><p class="help">Everything that is not in play. Any of it can come back.</p>
+    <div class="tabs">${Object.keys(t).map((k) => `<button class="tab" data-sub="${k}" aria-pressed="${k === sub}">${t[k]}<span>${n[k]}</span></button>`).join('')}</div>
+    <div class="filters"><input type="search" id="q" placeholder="Search university or program"><select id="sort">${SORT_OPTS}</select></div>
+    <div id="list"></div><button class="btn" id="more" hidden>Show 30 more</button>`;
 }
-document.addEventListener('click', (e) => {
-  const b = e.target.closest('.pick button');
-  if (b) {
-    const c = b.closest('.card'), k = c.dataset.k;
-    if (picks[k] === b.dataset.p) delete picks[k]; else picks[k] = b.dataset.p;
-    save();
-    c.className = 'card ' + (picks[k] || '');
-    c.querySelectorAll('.pick button').forEach((x) => x.classList.toggle('on', x.dataset.p === picks[k]));
-    counts();
-    return;
-  }
-  const t = e.target.closest('.tab');
-  if (t) { tab = +t.dataset.t; limit = 30; render(); window.scrollTo(0, 0); }
-});
-$('#more').addEventListener('click', () => { limit += 30; render(); });
-for (const id of ['q', 'sort', 'f-gre', 'f-eng', 'f-fund', 'f-fee', 'f-todo']) $('#' + id).addEventListener('input', () => { limit = 30; render(); });
+function viewRank() {
+  const R = ranked(), n = Math.max(1, S.n | 0), top = R.slice(0, n);
+  const unk = top.filter((r) => r.fee == null).length;
+  if (!R.length) return `<h1>Rank and lock</h1><div class="panel">Nothing kept yet. <button class="btn primary" data-v="go">Go to step 2</button></div>`;
+  return `<h1>Rank and lock</h1>
+    <p class="help">Best first. Drag a row, or use the arrows. Press a name to see its details. Programs above the line are the ones you apply to. The rest are your reserve.</p>
+    <div class="filters"><label>I will apply to <input type="number" id="n" min="1" value="${n}"> programs</label>
+      <span>Order them for me:</span><button class="btn" data-ord="best">Strongest</button><button class="btn" data-ord="deadline">Deadline</button><button class="btn" data-ord="fee">Fee</button></div>
+    ${C.todo.length ? `<div class="flag">${C.todo.length} programs are still undecided in step 2. They are not in this ranking.</div>` : ''}
+    <div id="rank" style="display:flex;flex-direction:column;gap:8px">${R.map((r, i) => `${i === n ? `<div class="cutline">Above: ${top.length} to apply, fees $${top.reduce((s, x) => s + (x.fee || 0), 0).toLocaleString()}${unk ? ' + ' + unk + ' not confirmed' : ''}. Below: ${R.length - n} in reserve.</div>` : ''}
+      <div class="rk ${i >= n ? 'res' : ''}" draggable="true" data-k="${r.key}"><span class="num">${i + 1}</span>
+        <div class="rk-main"><b>${esc(r.inst)}</b><div class="prog">${esc(r.program)}</div><div class="mini">${mini(r)}</div></div>
+        <div class="rk-btn"><button data-mv="top">Top</button><button data-mv="-1" aria-label="Up">&#9650;</button><button data-mv="1" aria-label="Down">&#9660;</button><button data-mv="drop">Drop</button></div></div>
+      ${openK === r.key ? card(r, '') : ''}`).join('')}</div>
+    <div class="row"><button class="btn primary" id="lock">Lock my list</button><span class="help">Makes a code to paste to Claude. You can lock again after another round.</span></div>
+    <div id="lockbox" hidden></div>`;
+}
+function show() {
+  compute();
+  const y = window.scrollY;
+  $('#view').innerHTML = { narrow: viewNarrow, go: viewGo, rank: viewRank, out: viewOut }[view]();
+  if ($('#sort')) $('#sort').value = sortBy;
+  if ($('#showin')) $('#showin').value = showIn;
+  if ($('#q')) $('#q').value = q;
+  fillList();
+  window.scrollTo(0, y);
+}
+const render = show;
+function move(k, to) {
+  const keys = ranked().map((r) => r.key), i = keys.indexOf(k);
+  keys.splice(i, 1); keys.splice(Math.max(0, Math.min(keys.length, to)), 0, k);
+  S.rank = keys; save(); show();
+}
 
-$('#lock').addEventListener('click', () => {
-  const by = counts(), box = $('#lockbox');
-  const line = (r) => `${r.key} | ${r.inst} | ${r.program}`;
-  const text = ['PHD LIST LOCK ' + new Date().toISOString().slice(0, 16), 'APPLY (' + by.apply.length + ')', ...by.apply.map(line), 'MAYBE (' + by.maybe.length + ')', ...by.maybe.map(line),
-    'NO (' + by.no.length + ')', by.no.map((r) => r.key).join(' ')].join('\n');
+document.addEventListener('click', (e) => {
+  const on = (s) => e.target.closest(s);
+  let b;
+  if ((b = on('[data-v]'))) { view = b.dataset.v; limit = 30; q = ''; show(); window.scrollTo(0, 0); }
+  else if ((b = on('[data-mode]'))) { mode = b.dataset.mode; show(); }
+  else if ((b = on('[data-sub]'))) { sub = b.dataset.sub; limit = 30; show(); }
+  else if ((b = on('.act button'))) act(b.dataset.do);
+  else if ((b = on('.pick button'))) {
+    const k = b.closest('.card').dataset.k, p = b.dataset.p;
+    if (p === 'add' || view === 'out' && p === 'keep') { S.extra.push(k); decide(k, 'keep'); }
+    else decide(k, S.d[k] === p ? '' : p);
+  }
+  else if ((b = on('[data-again]'))) {
+    S.round++; for (const r of C.kept) delete S.d[r.key];
+    hist = []; skipped = []; view = 'narrow'; save(); show(); window.scrollTo(0, 0);
+  }
+  else if ((b = on('[data-ord]'))) { S.rank = [...C.kept].sort(SORTS[b.dataset.ord]).map((r) => r.key); save(); show(); }
+  else if ((b = on('[data-mv]'))) {
+    const k = b.closest('.rk').dataset.k, i = ranked().findIndex((r) => r.key === k), m = b.dataset.mv;
+    if (m === 'drop') decide(k, 'drop'); else move(k, m === 'top' ? 0 : i + +m);
+  }
+  else if ((b = on('.rk-main'))) { const k = b.closest('.rk').dataset.k; openK = openK === k ? '' : k; show(); }
+  else if (on('#more')) { limit += 30; fillList(); }
+  else if (on('#lock')) lock();
+});
+function act(what) {
+  const a = $('.act'); if (!a || view !== 'go') return;
+  const k = a.dataset.k;
+  if (what === 'undo') { const h = hist.pop(); if (!h) return; if (h[1]) S.d[h[0]] = h[1]; else delete S.d[h[0]]; if (h[2]) S.dr[h[0]] = h[2]; else delete S.dr[h[0]]; save(); show(); }
+  else if (what === 'skip') { skipped = skipped.filter((x) => x !== k); skipped.push(k); show(); }
+  else decide(k, what);
+  window.scrollTo(0, 0);
+}
+document.addEventListener('keydown', (e) => {
+  if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) || e.metaKey || e.ctrlKey) return;
+  const w = { ArrowRight: 'keep', ArrowLeft: 'drop', ArrowDown: 'skip', z: 'undo', Z: 'undo' }[e.key];
+  if (w && $('.act')) { e.preventDefault(); act(w); }
+});
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.rule) S.rules[t.dataset.rule] = t.checked;
+  else if (t.id === 'r-fee') S.rules.fee = t.value;
+  else if (t.dataset.fam) S.rules.fam = t.checked ? S.rules.fam.filter((f) => f !== t.dataset.fam) : [...S.rules.fam, t.dataset.fam];
+  else if (t.id === 'n') S.n = Math.max(1, +t.value || 1);
+  else if (t.id === 'sort') { sortBy = t.value; show(); return; }
+  else if (t.id === 'showin') { showIn = t.value; show(); return; }
+  else return;
+  save(); show();
+});
+document.addEventListener('input', (e) => { if (e.target.id === 'q') { q = e.target.value.trim().toLowerCase(); limit = 30; fillList(); } });
+document.addEventListener('dragstart', (e) => { const r = e.target.closest && e.target.closest('.rk'); if (r) dragK = r.dataset.k; });
+document.addEventListener('dragover', (e) => { const r = e.target.closest('.rk'); if (r && dragK) { e.preventDefault(); document.querySelectorAll('.rk.over').forEach((x) => x.classList.remove('over')); r.classList.add('over'); } });
+document.addEventListener('drop', (e) => {
+  const r = e.target.closest('.rk'); if (!r || !dragK) return;
+  e.preventDefault();
+  const keys = ranked().map((x) => x.key), from = keys.indexOf(dragK), to = keys.indexOf(r.dataset.k);
+  const k = dragK; dragK = ''; if (from !== to) move(k, to);
+});
+
+function lock() {
+  const R = ranked(), n = Math.max(1, S.n | 0), box = $('#lockbox');
+  const line = (r, i) => `${i + 1} | ${r.key} | ${r.inst} | ${r.program}`;
+  const rules = [...RULES.filter(([id]) => S.rules[id]).map((x) => x[1]), S.rules.one ? 'One per university' : '', S.rules.fee !== 'any' ? 'Fee: ' + FEES[S.rules.fee] : '', ...S.rules.fam.map((f) => 'Field off: ' + f)].filter(Boolean);
+  const text = ['PHD LIST LOCK ' + new Date().toISOString().slice(0, 16) + ' round ' + S.round, 'RULES: ' + (rules.join('; ') || 'none'),
+    'APPLY, ranked (' + Math.min(n, R.length) + ')', ...R.slice(0, n).map(line), 'RESERVE, ranked (' + Math.max(0, R.length - n) + ')', ...R.slice(n).map((r, i) => line(r, i + n)),
+    'UNDECIDED (' + C.todo.length + ')', C.todo.map((r) => r.key).join(' '), 'DROPPED (' + C.dropped.length + ')', C.dropped.map((r) => r.key).join(' ')].join('\n');
   box.hidden = false;
-  box.innerHTML = `<b>Your list: ${by.apply.length} to apply, ${by.maybe.length} maybe</b>
-    ${by.maybe.length ? '<span class="help">You still have Maybe programs. You can lock now, or decide them first.</span>' : ''}
-    <ol>${by.apply.sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999')).map((r) => `<li>${esc(r.inst)}: ${esc(r.program)}${r.deadline ? ' (due ' + fmtDate(r.deadline) + ')' : ''}</li>`).join('') || '<li>Nothing marked Apply yet.</li>'}</ol>
+  box.innerHTML = `<b>Your list: ${Math.min(n, R.length)} to apply, ${Math.max(0, R.length - n)} in reserve</b>
     <span class="help">To lock: press Copy, then paste it to Claude in the chat. That is the step that makes it final.</span>
     <textarea readonly id="code"></textarea>
-    <div class="row"><button class="btn primary" id="copy">Copy</button><button class="btn" id="dl">Download as a file</button><button class="btn" id="close">Close</button><span id="copied" class="help"></span></div>`;
+    <div class="row"><button class="btn primary" id="copy">Copy</button><button class="btn" id="dl">Download as a file</button><span id="copied" class="help"></span></div>`;
   $('#code').value = text;
   $('#copy').onclick = async () => { try { await navigator.clipboard.writeText(text); } catch (e) { $('#code').select(); document.execCommand('copy'); } $('#copied').textContent = 'Copied. Now paste it to Claude.'; };
   $('#dl').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = 'phd-list.txt'; a.click(); };
-  $('#close').onclick = () => { box.hidden = true; };
-  window.scrollTo(0, 0);
-});
+  box.scrollIntoView({ block: 'center' });
+}
 </script>
 </body>
 </html>
