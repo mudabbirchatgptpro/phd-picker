@@ -157,7 +157,7 @@ const SORT_OPTS = '<option value="weak">Lowest score first</option><option value
 
 // S.d: key -> 'keep' | 'drop'. S.dr: round a program was dropped in. S.extra: programs he added from outside the best picks.
 let S = { round: 1, rules: { fee: 'any', fam: [] }, d: {}, dr: {}, extra: [], rank: [], n: 12 };
-let view = 'narrow', mode = 'one', sub = 'dropped', sortBy = 'best', showIn = 'todo', q = '', hist = [], skipped = [], openK = '', dragK = '';
+let view = 'uni', mode = 'one', sub = 'dropped', sortBy = 'best', showIn = 'todo', q = '', hist = [], skipped = [], openK = '', dragK = '';
 try {
   const s = JSON.parse(localStorage.getItem('phd-picker-state'));
   if (s) S = s;
@@ -204,8 +204,8 @@ function compute() {
   C = { cand, why, pool, removed: cand.filter((r) => why.has(r.key)), kept: pool.filter((r) => S.d[r.key] === 'keep'), todo: pool.filter((r) => !S.d[r.key]),
     dropped: P.filter((r) => S.d[r.key] === 'drop' && !r.dup) };
   $('#n-round').textContent = S.round; $('#n-todo').textContent = C.todo.length; $('#n-keep').textContent = C.kept.length; $('#n-drop').textContent = C.dropped.length;
-  const sm = { narrow: C.pool.length + ' programs in play', go: C.todo.length + ' left to decide', rank: C.kept.length + ' kept', out: (C.dropped.length + C.removed.length) + ' set aside' };
-  $('#steps').innerHTML = [['narrow', '1. Set rules'], ['go', '2. Keep or drop'], ['rank', '3. Rank and lock'], ['out', 'Left out']]
+  const sm = { uni: groups().length + ' universities to settle', narrow: C.pool.length + ' programs in play', go: C.todo.length + ' left to decide', rank: C.kept.length + ' kept', out: (C.dropped.length + C.removed.length) + ' set aside' };
+  $('#steps').innerHTML = [['uni', 'One per university'], ['narrow', '1. Set rules'], ['go', '2. Keep or drop'], ['rank', '3. Rank and lock'], ['out', 'Left out']]
     .map(([id, t]) => `<button class="step" data-v="${id}" aria-pressed="${id === view}"><b>${t}</b><small>${sm[id]}</small></button>`).join('');
 }
 function ranked() {
@@ -270,6 +270,31 @@ const mini = (r) => {
 };
 const pickBtns = (r) => `<div class="pick"><button class="n ${S.d[r.key] === 'drop' ? 'on' : ''}" data-p="drop">Drop</button><button class="a ${S.d[r.key] === 'keep' ? 'on' : ''}" data-p="keep">Keep</button></div>`;
 
+// Universities with two or more programs still in play.
+function groups() {
+  const g = new Map();
+  for (const r of (C.pool || [])) { const u = r.inst + (r.state ? ', ' + r.state : ''); if (!g.has(u)) g.set(u, []); g.get(u).push(r); }
+  return [...g].filter(([, v]) => v.length > 1).map(([u, v]) => [u, v.sort((a, b) => ((b.sc || {}).score || 0) - ((a.sc || {}).score || 0))])
+    .sort((a, b) => ((b[1][0].sc || {}).score || 0) - ((a[1][0].sc || {}).score || 0));
+}
+function viewUni() {
+  const G = groups(), solo = new Set(C.pool.map((r) => r.inst)).size - G.length;
+  if (!G.length) return `<h1>One program per university</h1><div class="panel"><h2>Done</h2><span>Every university in play now has one program: ${C.pool.length} programs at ${C.pool.length} universities.</span>
+    <div class="row"><button class="btn primary" data-v="go">Next: keep or drop, lowest score first</button></div></div>`;
+  return `<h1>One program per university</h1>
+    <p class="help">${G.length} universities have more than one of your programs: ${G.reduce((s, x) => s + x[1].length, 0)} programs in all. Press <b>Pick this one</b> and the others at that university are dropped. Highest score is listed first. ${solo} universities already have just one.</p>
+    <div class="row"><button class="btn" data-pickall="1">Pick the highest score at all ${G.length}</button><span class="help">You can undo any of them under Left out.</span></div>
+    ${G.map(([u, v]) => `<div class="panel"><h2>${esc(u)} <span class="help" style="font-weight:400">${v.length} programs</span></h2>
+      ${v.map((r, i) => `<div class="rk" data-k="${r.key}" style="cursor:default"><span class="num">${r.sc ? r.sc.score : '?'}</span>
+        <div class="rk-main"><b>${esc(r.program)}</b>${r.fee === 0 ? '<span class="free">FREE</span>' : ''}<div class="mini">${mini(r)}</div>
+          ${r.r2 ? `<div class="mini"><b>Against:</b> ${esc(r.r2.drop)}</div><div class="mini"><b>For:</b> ${esc(r.r2.keep)}</div>` : ''}</div>
+        <div class="rk-btn"><button data-pick="${r.key}" ${i ? '' : 'style="background:var(--go);color:#fff;border-color:var(--go)"'}>Pick this one</button></div></div>
+        ${openK === r.key ? card(r, '') : ''}`).join('')}</div>`).join('')}`;
+}
+function pickOne(k) {
+  const r = P.find((x) => x.key === k);
+  for (const x of C.pool) if (x.inst === r.inst && x.state === r.state && x.key !== k) { S.d[x.key] = 'drop'; S.dr[x.key] = S.round; }
+}
 function viewNarrow() {
   const open = C.cand.filter((r) => S.d[r.key] !== 'keep' && !S.extra.includes(r.key));
   const fams = {};
@@ -356,7 +381,7 @@ function show() {
     seeded = true;
     if (!Object.keys(S.d).length && S.round === 1) {
       for (const r of P) if (r.r1 === 'd') { S.d[r.key] = 'drop'; S.dr[r.key] = 1; }
-      S.round = 2; sortBy = 'weak'; view = 'go'; save();
+      S.round = 2; sortBy = 'weak'; view = 'uni'; save();
     }
   }
   compute();
@@ -364,7 +389,7 @@ function show() {
   const banner = S.round === 1 && C.kept.length ? `<div class="panel" style="border:2px solid var(--go)"><h2>Round 2 is ready</h2>
     <span>Your ${C.kept.length} kept programs now have a score out of 100 and a case to drop or keep. Round 2 shows them one at a time, lowest score first.</span>
     <div class="row"><button class="btn primary" data-again="go">Start round 2</button></div></div>` : '';
-  $('#view').innerHTML = banner + { narrow: viewNarrow, go: viewGo, rank: viewRank, out: viewOut }[view]();
+  $('#view').innerHTML = banner + { uni: viewUni, narrow: viewNarrow, go: viewGo, rank: viewRank, out: viewOut }[view]();
   if ($('#sort')) $('#sort').value = sortBy;
   if ($('#showin')) $('#showin').value = showIn;
   if ($('#q')) $('#q').value = q;
@@ -382,6 +407,8 @@ document.addEventListener('click', (e) => {
   const on = (s) => e.target.closest(s);
   let b;
   if ((b = on('[data-v]'))) { view = b.dataset.v; limit = 30; q = ''; show(); window.scrollTo(0, 0); }
+  else if ((b = on('[data-pick]'))) { pickOne(b.dataset.pick); save(); show(); }
+  else if ((b = on('[data-pickall]'))) { for (const [, v] of groups()) pickOne(v[0].key); save(); show(); window.scrollTo(0, 0); }
   else if ((b = on('[data-mode]'))) { mode = b.dataset.mode; show(); }
   else if ((b = on('[data-sub]'))) { sub = b.dataset.sub; limit = 30; show(); }
   else if ((b = on('.act button'))) act(b.dataset.do);
