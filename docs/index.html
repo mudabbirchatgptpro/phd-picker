@@ -251,7 +251,7 @@ function card(r, foot) {
     ${r.r2 ? `<div class="r2 ${r.r2.v}"><b>${r.sc ? `Score ${r.sc.score} of 100 · ranked ${r.r2.rank} of 227 · ` : ''}${V2[r.r2.v] || ''} · confidence ${esc(r.r2.conf || 'not stated')}</b>
       ${r.sc ? `<div class="subs">${SUBS.map(([k, t, m]) => `<span title="${esc(r.sc.why[k] || '')}">${t} <b>${r.sc.sub[k]}</b>/${m}</span>`).join('')}</div>` : ''}
       <div><b>Why drop:</b> ${esc(r.r2.drop)}</div><div><b>Why keep:</b> ${esc(r.r2.keep)}</div></div>` : ''}
-    ${r.late ? '<div class="flag"><b>Added 10 Oct.</b> A live PhD that was not among the first 350. Its facts have had a lighter read.</div>' : ''}
+    ${r.back ? '<div class="flag"><b>Brought back 10 Oct.</b> It had been excluded; a re-read of the official page did not support that.' + (r.fit0 != null ? ' Reader fit: ' + r.fit0 + ' of 5.' : '') + '</div>' : r.late ? '<div class="flag"><b>Added 10 Oct.</b> A live PhD that was not among the first 350. Its facts have had a lighter read.</div>' : ''}
     ${r.dup ? `<div class="flag">Looks like the same program as one already in play: ${esc(r.dup)}</div>` : ''}
     ${r.flags ? `<div class="flag">${esc(r.flags)}</div>` : ''}
     <details><summary>All details</summary><dl>${d}</dl></details>
@@ -376,12 +376,18 @@ function viewRank() {
 }
 let seeded = false;
 function show() {
-  // A browser with no saved marks starts from his round 1 result, at round 2.
+  // One-time move to round 3, for a browser with marks or without.
   if (!seeded && P.length) {
     seeded = true;
-    if (!Object.keys(S.d).length && S.round === 1) {
-      for (const r of P) if (r.r1 === 'd') { S.d[r.key] = 'drop'; S.dr[r.key] = 1; }
-      S.round = 2; sortBy = 'weak'; view = 'uni'; save();
+    if (!S.m3) {
+      // Round 3 starts from his round 1 drops plus his round 2 marks. Drops he made since stay; keeps go back to undecided.
+      for (const r of P) {
+        if (r.r1 === 'd') { S.d[r.key] = 'drop'; S.dr[r.key] = 1; }
+        else if (r.rest) { delete S.d[r.key]; delete S.dr[r.key]; }
+        else if (r.r2d && !S.d[r.key]) { S.d[r.key] = 'drop'; S.dr[r.key] = 2; }
+        else if (S.d[r.key] === 'keep') delete S.d[r.key];
+      }
+      S.round = 3; S.m3 = 1; sortBy = 'weak'; view = 'go'; save();
     }
   }
   compute();
