@@ -90,6 +90,8 @@ details dt{color:var(--mute)}details dd{margin:0;overflow-wrap:anywhere}
 .cutline{border-top:3px dashed var(--ink);padding-top:6px;font-weight:600}
 #n{width:70px;padding:8px;border:1px solid var(--line);border-radius:8px}
 @media(max-width:600px){.rk{flex-wrap:wrap}.rk-btn{width:100%;justify-content:flex-start}}
+.r2{border:2px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:14.5px}
+.r2.DROP{border-color:var(--no);background:var(--nobg)}.r2.LEAN_DROP{border-color:var(--may);background:var(--maybg)}.r2.KEEP,.r2.STRONG{border-color:var(--go);background:var(--gobg)}
 </style>
 </head>
 <body>
@@ -147,9 +149,10 @@ const STATUS = { pass: 'Clears every gate', check: 'Something not confirmed', we
 const phd = (r) => r.degree === 'PhD' || r.degree === 'PhD?';
 const base = (r) => r.bucket !== 'cut' && (r.short || r.locked || r.late || (r.bucket === 'pass' && phd(r)));
 const best = (a, b) => BO[a.bucket] - BO[b.bucket] || (b.locked ? 1 : 0) - (a.locked ? 1 : 0) || (a.short || 9) - (b.short || 9) || a.inst.localeCompare(b.inst);
-const SORTS = { best, deadline: (a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || best(a, b),
+const weak = (a, b) => ((b.r2 || {}).rank || 0) - ((a.r2 || {}).rank || 0) || best(b, a);
+const SORTS = { best, weak, r2: (a, b) => weak(b, a), deadline: (a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || best(a, b),
   inst: (a, b) => a.inst.localeCompare(b.inst) || best(a, b), fee: (a, b) => (a.fee ?? 9999) - (b.fee ?? 9999) || best(a, b) };
-const SORT_OPTS = '<option value="best">Strongest first</option><option value="deadline">Earliest deadline</option><option value="inst">University A to Z</option><option value="fee">Lowest fee</option>';
+const SORT_OPTS = '<option value="weak">Weakest first (round 2 research)</option><option value="best">Strongest first</option><option value="deadline">Earliest deadline</option><option value="inst">University A to Z</option><option value="fee">Lowest fee</option>';
 
 // S.d: key -> 'keep' | 'drop'. S.dr: round a program was dropped in. S.extra: programs he added from outside the best picks.
 let S = { round: 1, rules: { fee: 'any', fam: [] }, d: {}, dr: {}, extra: [], rank: [], n: 12 };
@@ -159,6 +162,7 @@ try {
   if (s) S = s;
   else for (const [k, v] of Object.entries(picks)) { S.d[k] = v === 'no' ? 'drop' : 'keep'; if (v === 'no') S.dr[k] = 1; }
 } catch (e) {}
+if (S.round >= 2) sortBy = 'weak';
 function save() {
   try { localStorage.setItem('phd-picker-state', JSON.stringify(S)); $('#saved').textContent = 'Saved ' + new Date().toLocaleTimeString(); }
   catch (e) { $('#saved').textContent = 'NOT SAVED: this browser blocks storage'; }
@@ -203,7 +207,7 @@ function compute() {
 }
 function ranked() {
   const pos = new Map(S.rank.map((k, i) => [k, i]));
-  return [...C.kept].sort((a, b) => (pos.has(a.key) ? pos.get(a.key) : 1e9) - (pos.has(b.key) ? pos.get(b.key) : 1e9) || best(a, b));
+  return [...C.kept].sort((a, b) => (pos.has(a.key) ? pos.get(a.key) : 1e9) - (pos.has(b.key) ? pos.get(b.key) : 1e9) || ((a.r2 || {}).rank || 999) - ((b.r2 || {}).rank || 999) || best(a, b));
 }
 function decide(k, v) {
   hist.push([k, S.d[k], S.dr[k]]);
@@ -212,6 +216,7 @@ function decide(k, v) {
   save(); show();
 }
 
+const V2 = { STRONG: 'Strong keep', KEEP: 'Keep', LEAN_DROP: 'Leaning drop', DROP: 'Drop' };
 const GRE = { required: ['Required', 'bad'], optional: ['Optional', 'good'], not_required: ['Not required', 'good'], not_accepted: ['Not accepted', 'good'], unknown: ['Not confirmed', 'unk'] };
 const FUND = { guaranteed: ['Guaranteed', 'good'], most: ['Most students', 'good'], competitive: ['Competitive', 'unk'], none: ['None', 'bad'], unknown: ['Not confirmed', 'unk'] };
 const ENG = { waived_us_degree: ['Not needed (US degree)', 'good'], required: ['TOEFL/IELTS needed', 'bad'], unclear: ['Unclear for you, see note', 'unk'] };
@@ -223,7 +228,8 @@ function card(r, foot) {
   const fee = r.fee === 0 ? ['Free', 'good'] : r.fee != null ? ['$' + r.fee, ''] : ['Not confirmed', 'unk'];
   const dl = r.deadline ? [fmtDate(r.deadline), ''] : r.deadline_text ? ['Last cycle, see details', 'unk'] : ['Not confirmed', 'unk'];
   const visa = r.online ? ['Online, no F-1', 'bad'] : null;
-  const d = [['Why this status', (r.why || []).join('; ')], ['GRE, in their words', r.gre_quote], ['English test, in their words', r.eng_quote], ['English minimum', r.eng_min],
+  const x = r.r2 || {};
+  const d = [['Faculty fit', x.fit_why], ['Standing', x.rep], ['How selective', x.sel], ['What they expect', x.bar], ['Eligibility and visa', x.elig], ['Money', x.money], ['Outcomes', x.out], ['Red flags', x.red], ['Why this status', (r.why || []).join('; ')], ['GRE, in their words', r.gre_quote], ['English test, in their words', r.eng_quote], ['English minimum', r.eng_min],
     ['Funding, in their words', r.fund_quote], ['Stipend', r.stipend], ['Years funded', r.fund_years], ['Deadline note', r.deadline_text],
     ['Fee waiver, how', r.fee_waiver_how], ['Fee note', r.fee_note], ['Taking students for fall 2027', { yes: 'Yes', no: 'No', unknown: 'Not confirmed' }[r.admit]],
     ['STEM field (for OPT)', r.stem === true ? 'Yes' : r.stem === false ? 'No' : ''], ['What to submit', r.materials], ['Faculty', r.faculty],
@@ -238,6 +244,8 @@ function card(r, foot) {
     <div class="facts">${fact('Application fee', fee)}${fact('Fee waiver', WAIVE[r.fee_waiver] || ['Not confirmed', 'unk'])}${fact('GRE', GRE[r.gre] || GRE.unknown)}
       ${fact('English test', ENG[r.eng] || ['Not confirmed', 'unk'], r.eng ? '' : '')}${fact('Funding', visa && r.fund === 'unknown' ? visa : FUND[r.fund] || FUND.unknown, r.stipend ? String(r.stipend).slice(0, 40) : '')}${fact('Deadline', dl)}</div>
     ${r.online ? '<div class="flag">Online program: it cannot sponsor an F-1 visa.</div>' : ''}
+    ${r.r2 ? `<div class="r2 ${r.r2.v}"><b>Round 2 research: ranked ${r.r2.rank} of 230 · ${V2[r.r2.v] || ''} · fit ${r.r2.fit} of 5 · confidence ${esc(r.r2.conf || 'not stated')}</b>
+      <div><b>Why drop:</b> ${esc(r.r2.drop)}</div><div><b>Why keep:</b> ${esc(r.r2.keep)}</div></div>` : ''}
     ${r.late ? '<div class="flag"><b>Added 10 Oct.</b> A live PhD that was not among the first 350. Its facts have had a lighter read.</div>' : ''}
     ${r.dup ? `<div class="flag">Looks like the same program as one already in play: ${esc(r.dup)}</div>` : ''}
     ${r.flags ? `<div class="flag">${esc(r.flags)}</div>` : ''}
@@ -283,7 +291,8 @@ function viewGo() {
       <select id="sort">${SORT_OPTS}</select>
       ${mode === 'list' ? `<select id="showin"><option value="todo">Left to decide</option><option value="keep">Kept</option><option value="all">Both</option></select><input type="search" id="q" placeholder="Search university or program">` : ''}</div>
     <div class="bar"><i style="width:${total ? Math.round(100 * done / total) : 0}%"></i></div>
-    <div class="help">${done} of ${total} decided. ${C.kept.length} kept.</div>`;
+    <div class="help">${done} of ${total} decided. ${C.kept.length} kept.</div>
+    ${C.kept.length && C.todo.length ? `<div class="row"><button class="btn" data-again="1">Start round ${S.round + 1}: go through my ${C.kept.length} kept again, weakest first</button></div>` : ''}`;
   if (!C.todo.length && (mode === 'one' || showIn === 'todo')) return head + `<div class="panel"><h2>Round ${S.round} is done</h2>
       <span>You kept <b>${C.kept.length}</b> programs at ${new Set(C.kept.map((r) => r.inst)).size} universities.</span>
       <span class="help">Too many? Go through only the kept ones again. Each round the list gets shorter.</span>
@@ -326,7 +335,7 @@ function viewRank() {
   return `<h1>Rank and lock</h1>
     <p class="help">Best first. Drag a row, or use the arrows. Press a name to see its details. Programs above the line are the ones you apply to. The rest are your reserve.</p>
     <div class="filters"><label>I will apply to <input type="number" id="n" min="1" value="${n}"> programs</label>
-      <span>Order them for me:</span><button class="btn" data-ord="best">Strongest</button><button class="btn" data-ord="deadline">Deadline</button><button class="btn" data-ord="fee">Fee</button></div>
+      <span>Order them for me:</span><button class="btn" data-ord="r2">Round 2 research</button><button class="btn" data-ord="best">First strength</button><button class="btn" data-ord="deadline">Deadline</button><button class="btn" data-ord="fee">Fee</button></div>
     ${C.todo.length ? `<div class="flag">${C.todo.length} programs are still undecided in step 2. They are not in this ranking.</div>` : ''}
     <div id="rank" style="display:flex;flex-direction:column;gap:8px">${R.map((r, i) => `${i === n ? `<div class="cutline">Above: ${top.length} to apply, fees $${top.reduce((s, x) => s + (x.fee || 0), 0).toLocaleString()}${unk ? ' + ' + unk + ' not confirmed' : ''}. Below: ${R.length - n} in reserve.</div>` : ''}
       <div class="rk ${i >= n ? 'res' : ''}" draggable="true" data-k="${r.key}"><span class="num">${i + 1}</span>
@@ -367,7 +376,7 @@ document.addEventListener('click', (e) => {
   }
   else if ((b = on('[data-again]'))) {
     S.round++; for (const r of C.kept) delete S.d[r.key];
-    hist = []; skipped = []; view = 'narrow'; save(); show(); window.scrollTo(0, 0);
+    hist = []; skipped = []; sortBy = 'weak'; view = 'narrow'; save(); show(); window.scrollTo(0, 0);
   }
   else if ((b = on('[data-ord]'))) { S.rank = [...C.kept].sort(SORTS[b.dataset.ord]).map((r) => r.key); save(); show(); }
   else if ((b = on('[data-mv]'))) {
