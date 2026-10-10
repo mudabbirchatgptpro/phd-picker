@@ -401,6 +401,12 @@ function show() {
       for (const r of P) if (r.ap) { S.d[r.key] = 'keep'; delete S.dr[r.key]; }
       S.m5 = 1; save();
     }
+    if (!S.m6 && P.some((r) => r.ap2)) {
+      // His word of 10 Oct: every addition joins round 3, and the free ones are kept.
+      S.rules.late = false;
+      for (const r of P) if (r.ap2 && !S.d[r.key]) S.d[r.key] = 'keep';
+      S.m6 = 1; save();
+    }
   }
   compute();
   const y = window.scrollY;
