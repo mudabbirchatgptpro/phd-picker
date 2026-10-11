@@ -92,6 +92,8 @@ details dt{color:var(--mute)}details dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:600px){.rk{flex-wrap:wrap}.rk-btn{width:100%;justify-content:flex-start}}
 .subs{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13.5px}.free{background:var(--go);color:#fff;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:6px}
 .r2{border:2px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:14.5px}
+.rk.kp{border-left:6px solid var(--go)}.rk.dp{opacity:.5}.rk-btn .on-k{background:var(--go);color:#fff;border-color:var(--go)}.tier{position:sticky;top:44px;z-index:3;background:var(--bg);padding:8px 0;margin:0;font-size:19px}
+.rub{width:100%;border-collapse:collapse;font-size:14px}.rub td,.rub th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 .r2.DROP{border-color:var(--no);background:var(--nobg)}.r2.LEAN_DROP{border-color:var(--may);background:var(--maybg)}.r2.KEEP,.r2.STRONG{border-color:var(--go);background:var(--gobg)}
 </style>
 </head>
@@ -165,6 +167,7 @@ try {
 } catch (e) {}
 if (S.round >= 2) sortBy = 'weak';
 if (S.rules.late === undefined) S.rules.late = true;
+if (S.round >= 3) view = 'board';
 function save() {
   try { localStorage.setItem('phd-picker-state', JSON.stringify(S)); $('#saved').textContent = 'Saved ' + new Date().toLocaleTimeString(); }
   catch (e) { $('#saved').textContent = 'NOT SAVED: this browser blocks storage'; }
@@ -204,8 +207,8 @@ function compute() {
   C = { cand, why, pool, removed: cand.filter((r) => why.has(r.key)), kept: pool.filter((r) => S.d[r.key] === 'keep'), todo: pool.filter((r) => !S.d[r.key]),
     dropped: P.filter((r) => S.d[r.key] === 'drop' && !r.dup) };
   $('#n-round').textContent = S.round; $('#n-todo').textContent = C.todo.length; $('#n-keep').textContent = C.kept.length; $('#n-drop').textContent = C.dropped.length;
-  const sm = { uni: groups().length + ' universities to settle', narrow: C.pool.length + ' programs in play', go: C.todo.length + ' left to decide', rank: C.kept.length + ' kept', out: (C.dropped.length + C.removed.length) + ' set aside' };
-  $('#steps').innerHTML = [['uni', 'One per university'], ['narrow', '1. Set rules'], ['go', '2. Keep or drop'], ['rank', '3. Rank and lock'], ['out', 'Left out']]
+  const sm = { board: C.pool.length + ' in play, by tier and score', uni: groups().length + ' universities to settle', narrow: C.pool.length + ' programs in play', go: C.todo.length + ' left to decide', rank: C.kept.length + ' kept', out: (C.dropped.length + C.removed.length) + ' set aside' };
+  $('#steps').innerHTML = [['board', 'Ranked board'], ['uni', 'One per university'], ['narrow', '1. Set rules'], ['go', '2. Keep or drop'], ['rank', '3. Rank and lock'], ['out', 'Left out']]
     .map(([id, t]) => `<button class="step" data-v="${id}" aria-pressed="${id === view}"><b>${t}</b><small>${sm[id]}</small></button>`).join('');
 }
 function ranked() {
@@ -224,7 +227,7 @@ const V2 = { STRONG: 'Strong keep', KEEP: 'Keep', LEAN_DROP: 'Leaning drop', DRO
 const GRE = { required: ['Required', 'bad'], optional: ['Optional', 'good'], not_required: ['Not required', 'good'], not_accepted: ['Not accepted', 'good'], unknown: ['Not confirmed', 'unk'] };
 const FUND = { guaranteed: ['Guaranteed', 'good'], most: ['Most students', 'good'], competitive: ['Competitive', 'unk'], none: ['None', 'bad'], unknown: ['Not confirmed', 'unk'] };
 const ENG = { waived_us_degree: ['Not needed (US degree)', 'good'], required: ['TOEFL/IELTS needed', 'bad'], unclear: ['Unclear for you, see note', 'unk'] };
-const WAIVE = { yes_international: ['Yes, for you', 'good'], yes_some: ['Some waivers', 'unk'], need_based: ['Need-based', 'unk'], domestic_only: ['US applicants only', 'bad'], none: ['None', 'bad'] };
+const WAIVE = { yes_international: ['Yes, for you', 'good'], yes_some: ['Some waivers', 'unk'], need_based: ['Need-based', 'unk'], domestic_only: ['US applicants only', 'bad'], no: ['Not for you', 'bad'], none: ['None', 'bad'] };
 const fmtDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 const fact = (label, [v, cls], sub) => `<div class="f ${cls || ''}"><small>${label}</small><b>${esc(v)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 function card(r, foot) {
@@ -264,7 +267,7 @@ function card(r, foot) {
 const mini = (r) => {
   const sp = ([v, c]) => `<span class="${c || ''}">${esc(v)}</span>`;
   return [sp(r.fee === 0 ? ['Free', 'good'] : r.fee != null ? ['$' + r.fee, ''] : ['Fee not confirmed', 'unk']),
-    sp(r.gre === 'unknown' || !r.gre ? ['GRE not confirmed', 'unk'] : ['No GRE', 'good']),
+    sp(r.gre === 'required' ? ['GRE required', 'bad'] : r.gre === 'optional' ? ['GRE optional', 'good'] : r.gre === 'unknown' || !r.gre ? ['GRE not confirmed', 'unk'] : ['No GRE', 'good']),
     sp({ waived_us_degree: ['No English test', 'good'], required: ['TOEFL/IELTS needed', 'bad'] }[r.eng] || ['English test unclear', 'unk']),
     sp(['Funding: ' + (FUND[r.fund] || FUND.unknown)[0].toLowerCase(), (FUND[r.fund] || FUND.unknown)[1]]),
     sp(r.deadline ? ['Due ' + fmtDate(r.deadline), ''] : ['Deadline not confirmed', 'unk'])].join(' · ');
@@ -375,6 +378,65 @@ function viewRank() {
     <div class="row"><button class="btn primary" id="lock">Lock my list</button><span class="help">Makes a code to paste to Claude. You can lock again after another round.</span></div>
     <div id="lockbox" hidden></div>`;
 }
+// The ranked board: his tiers (free, then waiver open to him, then the rest by score), with the gated ones listed last.
+const TIERS = [['a', '1. Free to apply', 'Your rule: you apply to every one of these. Nothing to pay.'],
+  ['b', '2. Fee waiver open to you', 'The fee comes off if you ask the way each row says. Consider these next.'],
+  ['c', '3. Everything else, ranked by score', 'You pay the fee here, so the score decides. Where a waiver might exist but the page does not say it covers international applicants, the row says "waiver: ask".'],
+  ['x', 'Blocked by a gate', 'GRE required (your hard cut), online, closed for fall 2027, or closed to international students. Listed so nothing is hidden; drop them or overrule.']];
+const RUB = { fit: 'How many current faculty do work you could join: AI and technology for learning, learning design, measuring learning, teacher learning. Named on the card.',
+  funding: 'Full marks for a written multi-year stipend and tuition that covers international students. About half when funding is competitive. Near zero when students pay.',
+  eligibility: 'In person and full time so it can issue an I-20, no degree prerequisite you lack, English test waived by your Harvard degree, STEM designation.',
+  odds: 'Admit rate and cohort size where published, and how close your profile is to who they admit.',
+  standing: 'Rank and research standing of the school and the program.',
+  certainty: 'How much of the above was read on official pages rather than inferred.',
+  cost: 'Free 5, up to $50 4, up to $75 3, up to $100 2, above 1. Fee not confirmed 2.',
+  gre: 'Not required or not accepted 3, optional 2, not confirmed 1, required 0.' };
+let bShow = 'all', cutN = 40, lastBulk = '';
+const tierOf = (r) => r.blk ? 'x' : r.fee === 0 ? 'a' : r.fee_waiver === 'yes_international' ? 'b' : 'c';
+const bRow = (r, i) => {
+  const st = S.d[r.key];
+  const w = r.fee === 0 ? '' : r.fee_waiver === 'yes_international' ? '<span class="good">waiver open to you</span>' : ['yes_some', 'need_based'].includes(r.fee_waiver) ? '<span class="unk">waiver: ask</span>' : r.fee_waiver ? '<span>no waiver for you</span>' : '<span class="unk">waiver not confirmed</span>';
+  return `<div class="rk ${st === 'keep' ? 'kp' : ''}" data-k="${r.key}" style="cursor:default"><span class="num">${r.sc ? r.sc.score : '?'}</span>
+    <div class="rk-main"><b>${i + 1}. ${esc(r.inst)}${r.state ? ', ' + esc(r.state) : ''}</b>${r.fee === 0 ? '<span class="free">FREE</span>' : ''}${st === 'keep' ? '<span class="free" style="background:var(--ink)">KEPT</span>' : ''}
+      <div class="prog">${esc(r.program)}</div>
+      <div class="mini">${mini(r)}${w ? ' · ' + w : ''} · ${r.deep || !r.s3 ? 'full read' : r.f4 ? 'fee, waiver and GRE re-read' : 'light read'}</div>
+      ${r.blk ? `<div class="mini"><span class="bad">${esc(r.blk)}</span></div>` : ''}
+      ${tierOf(r) === 'b' && r.fee_waiver_how ? `<div class="mini"><b>How to get the waiver:</b> ${esc(r.fee_waiver_how)}</div>` : ''}</div>
+    <div class="rk-btn"><button data-bd="drop">Drop</button><button data-bd="keep" class="${st === 'keep' ? 'on-k' : ''}">Keep</button></div></div>
+    ${openK === r.key ? card(r, '') : ''}`;
+};
+function viewBoard() {
+  const src = (bShow === 'todo' ? C.todo : bShow === 'keep' ? C.kept : C.pool).filter((r) => !q || (r.inst + ' ' + r.program + ' ' + (r.state || '')).toLowerCase().includes(q));
+  const by = (t) => src.filter((r) => tierOf(r) === t).sort((a, b) => ((b.sc || {}).score || 0) - ((a.sc || {}).score || 0) || a.inst.localeCompare(b.inst));
+  const todo = (t) => C.todo.filter((r) => tierOf(r) === t);
+  const low = C.todo.filter((r) => 'bc'.includes(tierOf(r)) && ((r.sc || {}).score || 0) < cutN);
+  const n = (t) => C.pool.filter((r) => tierOf(r) === t).length;
+  return `<h1>Ranked board</h1>
+    <p class="help">Every program still in play, in your order: free first, then the ones that will waive the fee for you, then the rest by score out of 100. Press a name for the full card. Keep and Drop work on each row. Dropped programs wait under <b>Left out</b>.</p>
+    <div class="panel"><div class="row" style="gap:18px">${TIERS.map(([t, h]) => `<span><span class="big">${n(t)}</span><br><small class="help">${h}</small></span>`).join('')}</div>
+      <span class="help">${C.kept.length} kept, ${C.todo.length} undecided, ${C.dropped.length} dropped by you.</span></div>
+    <details class="panel"><summary><b>How the score works (100 points)</b></summary>
+      <table class="rub"><tr><th>Factor</th><th>Points</th><th>What earns them</th></tr>${SUBS.map(([k, t, m]) => `<tr><td>${t}</td><td>${m}</td><td>${RUB[k]}</td></tr>`).join('')}</table>
+      <span class="help">Tiers come before the score: a free program is applied to whatever it scores, unless a gate blocks it. Each row says how deeply it was read. A "light read" score is good enough to drop on, not to rank finely.</span></details>
+    <div class="panel"><h2>Clear the bottom in one press</h2>
+      <div class="row"><label>Drop every undecided paid or waiver program scoring under <input type="number" id="cut" min="0" max="100" value="${cutN}" style="width:70px;padding:8px;border:1px solid var(--line);border-radius:8px"></label>
+        <button class="btn" data-bulk="low" ${low.length ? '' : 'disabled'}>Drop these ${low.length}</button></div>
+      <div class="row"><button class="btn" data-bulk="x" ${todo('x').length ? '' : 'disabled'}>Drop the ${todo('x').length} undecided blocked by a gate</button>
+        <button class="btn" data-bulk="a" ${todo('a').length ? '' : 'disabled'}>Keep the ${todo('a').length} undecided free ones</button>
+        ${lastBulk ? '<button class="btn primary" data-bulk="undo">Undo that</button>' : ''}</div></div>
+    <div class="filters"><select id="bshow"><option value="all">Kept and undecided</option><option value="todo">Undecided only</option><option value="keep">Kept only</option></select><input type="search" id="q" placeholder="Search university or program"></div>
+    <div id="board" style="display:flex;flex-direction:column;gap:8px">${TIERS.map(([t, h, sub]) => { const L = by(t); return `<h2 class="tier">${h} <span class="help" style="font-weight:400;font-size:14px">${L.length} shown</span></h2><p class="help">${sub}</p>${L.map(bRow).join('') || '<p class="help">None.</p>'}`; }).join('')}</div>`;
+}
+function bulk(what) {
+  if (what === 'undo') { const b = JSON.parse(lastBulk); S.d = b[0]; S.dr = b[1]; lastBulk = ''; save(); show(); return; }
+  lastBulk = JSON.stringify([S.d, S.dr]);
+  for (const r of C.todo) {
+    const t = tierOf(r);
+    if (what === 'a' && t === 'a') S.d[r.key] = 'keep';
+    else if (what === 'x' && t === 'x' || what === 'low' && 'bc'.includes(t) && ((r.sc || {}).score || 0) < cutN) { S.d[r.key] = 'drop'; S.dr[r.key] = S.round; }
+  }
+  save(); show();
+}
 // Rank among the programs still in play this round, leaving out the ones kept by his free-or-waiver rule.
 function rankOf(r) {
   if (r.ap) return 'kept by your free or waiver rule · ';
@@ -422,9 +484,10 @@ function show() {
   const banner = S.round === 1 && C.kept.length ? `<div class="panel" style="border:2px solid var(--go)"><h2>Round 2 is ready</h2>
     <span>Your ${C.kept.length} kept programs now have a score out of 100 and a case to drop or keep. Round 2 shows them one at a time, lowest score first.</span>
     <div class="row"><button class="btn primary" data-again="go">Start round 2</button></div></div>` : '';
-  $('#view').innerHTML = banner + { uni: viewUni, narrow: viewNarrow, go: viewGo, rank: viewRank, out: viewOut }[view]();
+  $('#view').innerHTML = banner + { board: viewBoard, uni: viewUni, narrow: viewNarrow, go: viewGo, rank: viewRank, out: viewOut }[view]();
   if ($('#sort')) $('#sort').value = sortBy;
   if ($('#showin')) $('#showin').value = showIn;
+  if ($('#bshow')) $('#bshow').value = bShow;
   if ($('#q')) $('#q').value = q;
   fillList();
   window.scrollTo(0, y);
@@ -440,6 +503,8 @@ document.addEventListener('click', (e) => {
   const on = (s) => e.target.closest(s);
   let b;
   if ((b = on('[data-v]'))) { view = b.dataset.v; limit = 30; q = ''; show(); window.scrollTo(0, 0); }
+  else if ((b = on('[data-bulk]'))) bulk(b.dataset.bulk);
+  else if ((b = on('[data-bd]'))) { const k = b.closest('.rk').dataset.k, p = b.dataset.bd; decide(k, S.d[k] === p ? '' : p); }
   else if ((b = on('[data-pick]'))) { pickOne(b.dataset.pick); save(); show(); }
   else if ((b = on('[data-pickall]'))) { for (const [, v] of groups()) pickOne(v[0].key); save(); show(); window.scrollTo(0, 0); }
   else if ((b = on('[data-mode]'))) { mode = b.dataset.mode; show(); }
@@ -483,12 +548,14 @@ document.addEventListener('change', (e) => {
   else if (t.dataset.fam) S.rules.fam = t.checked ? S.rules.fam.filter((f) => f !== t.dataset.fam) : [...S.rules.fam, t.dataset.fam];
   else if (t.dataset.gre) S.rules.gre = t.checked ? (S.rules.gre || []).filter((g) => g !== t.dataset.gre) : [...(S.rules.gre || []), t.dataset.gre];
   else if (t.id === 'n') S.n = Math.max(1, +t.value || 1);
+  else if (t.id === 'cut') { cutN = +t.value || 0; show(); return; }
+  else if (t.id === 'bshow') { bShow = t.value; show(); return; }
   else if (t.id === 'sort') { sortBy = t.value; show(); return; }
   else if (t.id === 'showin') { showIn = t.value; show(); return; }
   else return;
   save(); show();
 });
-document.addEventListener('input', (e) => { if (e.target.id === 'q') { q = e.target.value.trim().toLowerCase(); limit = 30; fillList(); } });
+document.addEventListener('input', (e) => { if (e.target.id === 'q') { q = e.target.value.trim().toLowerCase(); limit = 30; if (view === 'board') { show(); const i = $('#q'); i.focus(); i.setSelectionRange(q.length, q.length); } else fillList(); } });
 document.addEventListener('dragstart', (e) => { const r = e.target.closest && e.target.closest('.rk'); if (r) dragK = r.dataset.k; });
 document.addEventListener('dragover', (e) => { const r = e.target.closest('.rk'); if (r && dragK) { e.preventDefault(); document.querySelectorAll('.rk.over').forEach((x) => x.classList.remove('over')); r.classList.add('over'); } });
 document.addEventListener('drop', (e) => {
