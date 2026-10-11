@@ -222,7 +222,7 @@ function decide(k, v) {
   save(); show();
 }
 
-const SUBS = [['fit', 'Faculty fit', 25], ['funding', 'Funding', 20], ['eligibility', 'Eligibility and visa', 15], ['odds', 'Your odds', 15], ['standing', 'Standing', 10], ['certainty', 'Certainty', 7], ['cost', 'Cost to apply', 5], ['gre', 'GRE', 3]];
+const SUBS = [['fit', 'Faculty fit', 25], ['funding', 'Funding', 20], ['eligibility', 'Eligibility and visa', 12], ['odds', 'Your odds', 15], ['standing', 'Standing', 10], ['certainty', 'Certainty', 7], ['cost', 'Cost to apply', 5], ['gre', 'GRE', 3], ['eng', 'English test (TOEFL / IELTS)', 3]];
 const V2 = { STRONG: 'Strong keep', KEEP: 'Keep', LEAN_DROP: 'Leaning drop', DROP: 'Drop' };
 const GRE = { required: ['Required', 'bad'], optional: ['Optional', 'good'], not_required: ['Not required', 'good'], not_accepted: ['Not accepted', 'good'], unknown: ['Not confirmed', 'unk'] };
 const FUND = { guaranteed: ['Guaranteed', 'good'], most: ['Most students', 'good'], competitive: ['Competitive', 'unk'], none: ['None', 'bad'], unknown: ['Not confirmed', 'unk'] };
@@ -385,12 +385,13 @@ const TIERS = [['a', '1. Free to apply', 'Your rule: you apply to every one of t
   ['x', 'Blocked by a gate', 'GRE required (your hard cut), online, closed for fall 2027, or closed to international students. Listed so nothing is hidden; drop them or overrule.']];
 const RUB = { fit: 'How many current faculty do work you could join: AI and technology for learning, learning design, measuring learning, teacher learning. Named on the card.',
   funding: 'Full marks for a written multi-year stipend and tuition that covers international students. About half when funding is competitive. Near zero when students pay.',
-  eligibility: 'In person and full time so it can issue an I-20, no degree prerequisite you lack, English test waived by your Harvard degree, STEM designation.',
+  eligibility: 'In person and full time so it can issue an I-20, no degree prerequisite you lack, STEM designation.',
   odds: 'Admit rate and cohort size where published, and how close your profile is to who they admit.',
   standing: 'Rank and research standing of the school and the program.',
   certainty: 'How much of the above was read on official pages rather than inferred.',
   cost: 'Free 5, up to $50 4, up to $75 3, up to $100 2, above 1. Fee not confirmed 2.',
-  gre: 'Not required or not accepted 3, optional 2, not confirmed 1, required 0.' };
+  gre: 'Not required or not accepted 3, optional 2, not confirmed 1, required 0.',
+  eng: 'Waived by your Harvard degree 3, not confirmed 1, you would still have to sit TOEFL or IELTS 0.' };
 let bShow = 'all', cutN = 40, lastBulk = '';
 const tierOf = (r) => r.blk ? 'x' : r.fee === 0 ? 'a' : r.fee_waiver === 'yes_international' ? 'b' : 'c';
 const bRow = (r, i) => {
@@ -422,6 +423,7 @@ function viewBoard() {
       <div class="row"><label>Drop every undecided paid or waiver program scoring under <input type="number" id="cut" min="0" max="100" value="${cutN}" style="width:70px;padding:8px;border:1px solid var(--line);border-radius:8px"></label>
         <button class="btn" data-bulk="low" ${low.length ? '' : 'disabled'}>Drop these ${low.length}</button></div>
       <div class="row"><button class="btn" data-bulk="x" ${todo('x').length ? '' : 'disabled'}>Drop the ${todo('x').length} undecided blocked by a gate</button>
+        <button class="btn" data-bulk="eng" ${C.todo.filter((r) => r.eng === 'required').length ? '' : 'disabled'}>Drop the ${C.todo.filter((r) => r.eng === 'required').length} undecided that need TOEFL or IELTS from you</button>
         <button class="btn" data-bulk="a" ${todo('a').length ? '' : 'disabled'}>Keep the ${todo('a').length} undecided free ones</button>
         ${lastBulk ? '<button class="btn primary" data-bulk="undo">Undo that</button>' : ''}</div></div>
     <div class="filters"><select id="bshow"><option value="all">Kept and undecided</option><option value="todo">Undecided only</option><option value="keep">Kept only</option></select><input type="search" id="q" placeholder="Search university or program"></div>
@@ -433,7 +435,7 @@ function bulk(what) {
   for (const r of C.todo) {
     const t = tierOf(r);
     if (what === 'a' && t === 'a') S.d[r.key] = 'keep';
-    else if (what === 'x' && t === 'x' || what === 'low' && 'bc'.includes(t) && ((r.sc || {}).score || 0) < cutN) { S.d[r.key] = 'drop'; S.dr[r.key] = S.round; }
+    else if (what === 'eng' && r.eng === 'required' && t !== 'a' || what === 'x' && t === 'x' || what === 'low' && 'bc'.includes(t) && ((r.sc || {}).score || 0) < cutN) { S.d[r.key] = 'drop'; S.dr[r.key] = S.round; }
   }
   save(); show();
 }
